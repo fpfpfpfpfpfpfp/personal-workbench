@@ -278,10 +278,6 @@ dialog::backdrop { background: rgb(17 24 28 / 42%); }
 .toast.show { opacity: 1; transform: translateY(0); }
 
 .deploy-verification {
-  position: fixed;
-  left: 12px;
-  bottom: 10px;
-  z-index: 2;
   color: var(--muted);
   font-size: 10px;
   pointer-events: none;
