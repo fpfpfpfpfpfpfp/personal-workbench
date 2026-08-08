@@ -129,6 +129,7 @@ function applyWorkbenchState(data) {
   localStorage.setItem(ENCRYPTION_STORAGE, JSON.stringify(data.encryption || {}));
   if (data.avatar) localStorage.setItem(AVATAR_STORAGE, data.avatar); else localStorage.removeItem(AVATAR_STORAGE);
   if (data.protectedPasswordHash) localStorage.setItem(PROTECTED_PASSWORD_STORAGE, data.protectedPasswordHash);
+  renderSettings();
   renderCategory();
   renderDetail();
   return true;
