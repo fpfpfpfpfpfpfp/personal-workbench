@@ -390,12 +390,40 @@ elements.categoryAddForm.addEventListener("submit", (event) => {
   showToast(`${index} ${title} 已新增`);
 });
 
-elements.avatarInput.addEventListener("change", () => {
+function createAvatarDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    image.onload = () => {
+      const maxSize = 512;
+      const scale = Math.min(1, maxSize / Math.max(image.naturalWidth, image.naturalHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(objectUrl);
+      resolve(canvas.toDataURL("image/jpeg", 0.82));
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Invalid image"));
+    };
+    image.src = objectUrl;
+  });
+}
+
+elements.avatarInput.addEventListener("change", async () => {
   const file = elements.avatarInput.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => { localStorage.setItem(AVATAR_STORAGE, reader.result); renderSettings(); void saveRemoteState(); showToast("头像已更新"); };
-  reader.readAsDataURL(file);
+  try {
+    const avatar = await createAvatarDataUrl(file);
+    localStorage.setItem(AVATAR_STORAGE, avatar);
+    renderSettings();
+    await saveRemoteState();
+    showToast("头像已压缩并同步");
+  } catch {
+    showToast("头像处理失败，请选择 JPG、PNG 或 WebP 图片");
+  }
 });
 
 elements.removeAvatar.addEventListener("click", () => { localStorage.removeItem(AVATAR_STORAGE); renderSettings(); void saveRemoteState(); showToast("已恢复默认头像"); });
