@@ -18,14 +18,14 @@ let activeEditorPassword = null;
 
 const categories = [
   { id: "inbox", index: "00", title: "收件箱", eyebrow: "快速收集", description: "临时接住待判断、待整理的信息，再定期分配到正确位置。" },
-  { id: "plans", index: "01", title: "今日与计划", eyebrow: "行动安排", description: "管理今天、本周和更长期的目标，明确下一步应该做什么。" },
+  { id: "plans", index: "01", title: "日期与计划", eyebrow: "行动安排", description: "管理今天、本周和更长期的目标，明确下一步应该做什么。" },
   { id: "projects", index: "02", title: "进行中项目", eyebrow: "成果推进", description: "集中管理有明确目标和完成节点的事项。" },
   { id: "work", index: "03", title: "工作资料", eyebrow: "日常资源", description: "保存模板、会议记录、流程和需要反复使用的工作信息。" },
   { id: "knowledge", index: "04", title: "个人知识库", eyebrow: "长期积累", description: "沉淀经过理解、以后能够再次使用的知识与经验。" },
   { id: "content", index: "05", title: "内容与创作", eyebrow: "创作流程", description: "管理选题、素材、草稿以及已经发布的作品。" },
   { id: "tools", index: "06", title: "工具与配置", eyebrow: "环境维护", description: "记录软件、设备和数字工作环境的配置方式。" },
-  { id: "life", index: "98", title: "个人生活", eyebrow: "生活管理", description: "管理财务、健康、证件、旅行与家庭事务。" },
-  { id: "settings", index: "97", title: "设置", eyebrow: "工作台设置", description: "管理头像和各目录的访问保护。" },
+  { id: "life", index: "98", title: "个人文档", eyebrow: "文档管理", description: "管理个人证件、财务、健康、旅行与家庭资料。" },
+  { id: "settings", index: "97", title: "工作台设置", eyebrow: "系统配置", description: "管理头像和各目录的访问保护。" },
   { id: "archive", index: "99", title: "归档", eyebrow: "历史记录", description: "保存已经完成或暂时不活跃，但未来可能需要查询的内容。" },
 ];
 
@@ -315,7 +315,7 @@ function openProtectedDialog(categoryId) {
   state.pendingCategory = categoryId;
   state.recoveryMode = false;
   state.resettingProtectedPassword = false;
-  elements.protectedTitle.textContent = categoryId === SETTINGS_CATEGORY ? "打开设置" : "打开个人生活";
+  elements.protectedTitle.textContent = categoryId === SETTINGS_CATEGORY ? "打开工作台设置" : "打开个人文档";
   elements.protectedDescription.textContent = "该目录已加密，请输入访问密码。";
   elements.protectedPasswordLabel.hidden = false;
   elements.recoveryAnswerLabel.hidden = true;
@@ -410,7 +410,7 @@ elements.recoveryToggle.addEventListener("click", () => {
   elements.newProtectedPasswordLabel.hidden = true;
   elements.newProtectedPassword.required = false;
   elements.protectedError.hidden = true;
-  elements.protectedTitle.textContent = state.recoveryMode ? "回答验证问题" : "打开个人生活";
+  elements.protectedTitle.textContent = state.recoveryMode ? "回答验证问题" : "打开个人文档";
   elements.protectedDescription.textContent = state.recoveryMode
     ? "回答正确后，本次浏览会话将获得访问权限。"
     : "该目录已加密，请输入访问密码。";
@@ -455,7 +455,7 @@ elements.protectedForm.addEventListener("submit", async (event) => {
   elements.protectedDialog.close();
   enterCategory(state.pendingCategory || PROTECTED_CATEGORY);
   state.pendingCategory = null;
-  showToast("个人生活目录已解锁");
+  showToast("个人文档目录已解锁");
 });
 
 elements.cancelProtected.addEventListener("click", () => {
