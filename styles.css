@@ -277,12 +277,6 @@ dialog::backdrop { background: rgb(17 24 28 / 42%); }
 }
 .toast.show { opacity: 1; transform: translateY(0); }
 
-.deploy-verification {
-  color: var(--muted);
-  font-size: 10px;
-  pointer-events: none;
-}
-
 @media (max-width: 1050px) {
   .workspace { grid-template-columns: 210px 1fr; }
   .detail-panel { position: fixed; inset: 72px 0 0 auto; width: min(390px, 92vw); z-index: 3; box-shadow: var(--shadow); transform: translateX(105%); transition: transform 180ms ease; }
