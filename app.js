@@ -16,6 +16,12 @@ const RECOVERY_ANSWER_HASHES = new Set([
 const remoteConfig = window.WORKBENCH_REMOTE || {};
 let activeEditorPassword = null;
 
+const knowledgeTypeLabels = {
+  "project-memory": "项目记忆", person: "人物信息", concept: "概念与原理",
+  method: "方法与经验", decision: "决策记录", "source-summary": "资料摘要",
+};
+const knowledgeStatusLabels = { inbox: "待整理", current: "当前结论", draft: "历史草稿", question: "待确认问题" };
+
 const categories = [
   { id: "inbox", index: "00", title: "收件箱", eyebrow: "快速收集", description: "临时接住待判断、待整理的信息，再定期分配到正确位置。" },
   { id: "plans", index: "01", title: "日期与计划", eyebrow: "行动安排", description: "管理今天、本周和更长期的目标，明确下一步应该做什么。" },
@@ -53,6 +59,8 @@ const state = {
   selectedId: null,
   filter: "all",
   search: "",
+  knowledgeTypeFilter: "all",
+  knowledgeStatusFilter: "all",
   editing: false,
   pendingCategory: null,
   recoveryMode: false,
@@ -64,7 +72,7 @@ const state = {
 const elements = Object.fromEntries([
   "categoryNav", "categoryEyebrow", "categoryTitle", "categoryDescription", "itemList", "emptyState",
   "detailPanel", "detailEmpty", "detailForm", "detailCategory", "itemTitle", "itemStatus", "itemDate",
-  "itemBody", "knowledgeFields", "itemKnowledgeType", "itemTags", "itemProject", "itemPeople", "itemKnowledgeStatus", "newItemButton", "deleteButton", "searchInput", "editModeButton", "modeLabel", "shareButton",
+  "itemBody", "knowledgeFields", "itemKnowledgeType", "itemTags", "itemProject", "itemPeople", "itemKnowledgeStatus", "knowledgeFilters", "knowledgeTypeFilter", "knowledgeStatusFilter", "newItemButton", "deleteButton", "searchInput", "editModeButton", "modeLabel", "shareButton",
   "accessDialog", "accessForm", "accessTitle", "accessDescription", "accessKey", "accessError", "cancelAccess",
   "weeklyCount", "toast", "storageNotice", "protectedDialog", "protectedForm", "protectedTitle",
   "protectedDescription", "protectedPasswordLabel", "protectedPassword", "recoveryAnswerLabel", "recoveryAnswer",
@@ -210,8 +218,11 @@ function visibleItems() {
   return state.items.filter((item) => {
     const categoryMatch = item.category === state.category;
     const filterMatch = state.filter === "all" || item.status === state.filter;
-    const searchMatch = !query || `${item.title} ${item.body}`.toLowerCase().includes(query);
-    return categoryMatch && filterMatch && searchMatch;
+    const searchable = `${item.title} ${item.body} ${item.tags || ""} ${item.project || ""} ${item.people || ""}`.toLowerCase();
+    const searchMatch = !query || searchable.includes(query);
+    const typeMatch = state.category !== "knowledge" || state.knowledgeTypeFilter === "all" || item.knowledgeType === state.knowledgeTypeFilter;
+    const knowledgeStatusMatch = state.category !== "knowledge" || state.knowledgeStatusFilter === "all" || (item.knowledgeStatus || "inbox") === state.knowledgeStatusFilter;
+    return categoryMatch && filterMatch && searchMatch && typeMatch && knowledgeStatusMatch;
   });
 }
 
@@ -230,6 +241,7 @@ function renderItems() {
     <button class="item-card ${item.id === state.selectedId ? "selected" : ""}" data-id="${item.id}" type="button">
       <span class="item-card-main">
         <span class="item-title">${escapeHtml(item.title)}</span>
+        ${item.category === "knowledge" ? `<span class="knowledge-card-meta"><span>${escapeHtml(knowledgeTypeLabels[item.knowledgeType] || "待分类")}</span><span>${escapeHtml(knowledgeStatusLabels[item.knowledgeStatus || "inbox"])}</span>${item.tags ? `<span># ${escapeHtml(item.tags)}</span>` : ""}</span>` : ""}
         <span class="item-preview">${escapeHtml(item.body || "暂无详细内容")}</span>
       </span>
       <span class="item-meta">
@@ -248,6 +260,7 @@ function renderCategory() {
   elements.categoryTitle.textContent = category.title;
   elements.categoryDescription.textContent = category.description;
   document.body.classList.toggle("settings-view", state.category === SETTINGS_CATEGORY);
+  elements.knowledgeFilters.hidden = state.category !== "knowledge";
   renderNav();
   renderItems();
 }
@@ -506,6 +519,16 @@ elements.itemList.addEventListener("click", (event) => {
 
 elements.searchInput.addEventListener("input", (event) => {
   state.search = event.target.value;
+  renderItems();
+});
+
+elements.knowledgeTypeFilter.addEventListener("change", (event) => {
+  state.knowledgeTypeFilter = event.target.value;
+  renderItems();
+});
+
+elements.knowledgeStatusFilter.addEventListener("change", (event) => {
+  state.knowledgeStatusFilter = event.target.value;
   renderItems();
 });
 

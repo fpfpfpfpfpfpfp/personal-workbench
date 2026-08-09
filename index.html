@@ -56,6 +56,29 @@
             </div>
           </div>
 
+          <div id="knowledgeFilters" class="knowledge-filter-row" hidden>
+            <label>知识类型
+              <select id="knowledgeTypeFilter">
+                <option value="all">全部类型</option>
+                <option value="project-memory">项目记忆</option>
+                <option value="person">人物信息</option>
+                <option value="concept">概念与原理</option>
+                <option value="method">方法与经验</option>
+                <option value="decision">决策记录</option>
+                <option value="source-summary">资料摘要</option>
+              </select>
+            </label>
+            <label>知识状态
+              <select id="knowledgeStatusFilter">
+                <option value="all">全部状态</option>
+                <option value="inbox">待整理</option>
+                <option value="current">当前结论</option>
+                <option value="draft">历史草稿</option>
+                <option value="question">待确认问题</option>
+              </select>
+            </label>
+          </div>
+
           <div id="itemList" class="item-list"></div>
           <div id="emptyState" class="empty-state" hidden>
             <strong>这里还没有内容</strong>
