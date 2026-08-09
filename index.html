@@ -68,14 +68,8 @@
                 <option value="source-summary">资料摘要</option>
               </select>
             </label>
-            <label>关联项
-              <select id="knowledgeProjectFilter"><option value="all">全部关联项</option></select>
-            </label>
             <label>标签
               <select id="knowledgeTagFilter"><option value="all">全部标签</option></select>
-            </label>
-            <label>关联人物
-              <select id="knowledgePeopleFilter"><option value="all">全部人物</option></select>
             </label>
             <label>知识状态
               <select id="knowledgeStatusFilter">
@@ -91,7 +85,7 @@
           <div id="knowledgeGraph" class="knowledge-graph" hidden>
             <div class="knowledge-graph-heading"><div><strong>关系星图</strong><span>拖拽节点 · 滚轮缩放 · 点击打开知识</span></div><button id="knowledgeContextButton" class="button graph-action" type="button">复制 AI 背景包</button></div>
             <div id="knowledgeGraphCanvas" class="knowledge-graph-canvas"></div>
-            <div class="knowledge-graph-legend"><span class="knowledge">知识</span><span class="project">项目</span><span class="person">人物</span><span class="tag">标签</span></div>
+            <div class="knowledge-graph-legend"><span class="knowledge">知识</span><span class="project">项目标签</span><span class="person">人物标签</span><span class="tag">普通标签</span><span class="direct">明确链接更亮</span></div>
           </div>
 
           <div id="itemList" class="item-list"></div>
@@ -166,11 +160,7 @@
                   <option value="source-summary">资料摘要</option>
                 </select>
               </label>
-              <div class="form-grid">
-                <label>标签<input id="itemTags" list="tagSuggestions" placeholder="例如：项目A, 决策" /></label>
-                <label>关联项<input id="itemProject" list="projectSuggestions" placeholder="例如：项目A、主题或领域" /></label>
-              </div>
-              <label>关联人物<input id="itemPeople" list="peopleSuggestions" placeholder="例如：雷澍" /></label>
+              <label>标签<input id="itemTags" list="tagSuggestions" placeholder="可输入多个，例如：项目/螺钿独立站, 人物/方鹏, 主题/选品" /></label>
               <label>知识状态
                 <select id="itemKnowledgeStatus">
                   <option value="confirmed">已确认</option>
@@ -183,10 +173,14 @@
                 <p>根据标题和正文生成候选项；点击建议后才会写入字段。</p>
                 <div id="knowledgeSuggestionList" class="knowledge-suggestion-list"></div>
               </section>
+              <section class="knowledge-relations">
+                <div class="knowledge-suggestions-heading"><strong>明确关联知识</strong><span class="relation-help">正文输入 [[ 或在这里选择</span></div>
+                <div class="relation-add-row edit-only"><select id="knowledgeRelationSelect"><option value="">搜索并选择知识</option></select><button id="addKnowledgeRelation" class="button secondary" type="button">添加</button></div>
+                <div id="knowledgeRelationList" class="knowledge-relation-list"></div>
+                <div id="knowledgeLinkAutocomplete" class="knowledge-link-autocomplete" hidden></div>
+              </section>
             </div>
             <datalist id="tagSuggestions"></datalist>
-            <datalist id="projectSuggestions"></datalist>
-            <datalist id="peopleSuggestions"></datalist>
 
             <label>
               内容
