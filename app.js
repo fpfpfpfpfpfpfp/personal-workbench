@@ -6,6 +6,7 @@ const SETTINGS_CATEGORY = "settings";
 const ENCRYPTION_STORAGE = "personal-workbench-encryption-v1";
 const AVATAR_STORAGE = "personal-workbench-avatar-v1";
 const CUSTOM_CATEGORIES_STORAGE = "personal-workbench-custom-categories-v1";
+const KNOWLEDGE_METADATA_STORAGE = "personal-workbench-knowledge-metadata-v1";
 const PROTECTED_SESSION_KEY = "personal-workbench-life-unlocked";
 const PROTECTED_PASSWORD_STORAGE = "personal-workbench-life-password-v1";
 const PROTECTED_PASSWORD_HASH = "8d23cf6c86e834a7aa6eded54c26ce2bb2e74903538c61bdd5d2197997ab2f72";
@@ -73,7 +74,7 @@ const state = {
 const elements = Object.fromEntries([
   "categoryNav", "categoryEyebrow", "categoryTitle", "categoryDescription", "itemList", "emptyState",
   "detailPanel", "detailEmpty", "detailForm", "detailCategory", "itemTitle", "itemStatus", "itemDate",
-  "itemBody", "knowledgeFields", "itemKnowledgeType", "itemTags", "itemProject", "itemPeople", "itemKnowledgeStatus", "knowledgeLinks", "knowledgeLinksList", "knowledgeGraph", "knowledgeGraphCanvas", "knowledgeContextButton", "tagSuggestions", "projectSuggestions", "peopleSuggestions", "knowledgeFilters", "knowledgeSummary", "knowledgeTypeFilter", "knowledgeStatusFilter", "newItemButton", "deleteButton", "searchInput", "editModeButton", "modeLabel", "shareButton",
+  "itemBody", "knowledgeFields", "itemKnowledgeType", "itemTags", "itemProject", "itemPeople", "itemKnowledgeStatus", "knowledgeSuggestions", "knowledgeSuggestionList", "refreshKnowledgeSuggestions", "knowledgeLinks", "knowledgeLinksList", "knowledgeGraph", "knowledgeGraphCanvas", "knowledgeContextButton", "knowledgeManageButton", "knowledgeManagerDialog", "knowledgeManagerContent", "closeKnowledgeManager", "tagSuggestions", "projectSuggestions", "peopleSuggestions", "knowledgeFilters", "knowledgeSummary", "knowledgeTypeFilter", "knowledgeStatusFilter", "newItemButton", "deleteButton", "searchInput", "editModeButton", "modeLabel", "shareButton",
   "accessDialog", "accessForm", "accessTitle", "accessDescription", "accessKey", "accessError", "cancelAccess",
   "weeklyCount", "toast", "storageNotice", "protectedDialog", "protectedForm", "protectedTitle",
   "protectedDescription", "protectedPasswordLabel", "protectedPassword", "recoveryAnswerLabel", "recoveryAnswer",
@@ -126,6 +127,7 @@ function collectWorkbenchState() {
     encryption: JSON.parse(localStorage.getItem(ENCRYPTION_STORAGE) || "{}"),
     avatar: localStorage.getItem(AVATAR_STORAGE) || "",
     protectedPasswordHash: localStorage.getItem(PROTECTED_PASSWORD_STORAGE) || PROTECTED_PASSWORD_HASH,
+    knowledgeMetadata: loadKnowledgeMetadata(),
   };
 }
 
@@ -138,6 +140,7 @@ function applyWorkbenchState(data) {
   localStorage.setItem(ENCRYPTION_STORAGE, JSON.stringify(data.encryption || {}));
   if (data.avatar) localStorage.setItem(AVATAR_STORAGE, data.avatar); else localStorage.removeItem(AVATAR_STORAGE);
   if (data.protectedPasswordHash) localStorage.setItem(PROTECTED_PASSWORD_STORAGE, data.protectedPasswordHash);
+  localStorage.setItem(KNOWLEDGE_METADATA_STORAGE, JSON.stringify(data.knowledgeMetadata || {}));
   renderSettings();
   renderCategory();
   renderDetail();
@@ -251,6 +254,47 @@ function normalizeList(value) {
     .join(", ");
 }
 
+function loadKnowledgeMetadata() {
+  try { return JSON.parse(localStorage.getItem(KNOWLEDGE_METADATA_STORAGE)) || { disabledTypes: [] }; }
+  catch { return { disabledTypes: [] }; }
+}
+
+function renderKnowledgeTypeOptions() {
+  const disabledTypes = new Set(loadKnowledgeMetadata().disabledTypes || []);
+  [elements.itemKnowledgeType, elements.knowledgeTypeFilter].forEach((select) => {
+    [...select.options].forEach((option) => {
+      if (!option.value || option.value === "all") return;
+      option.hidden = disabledTypes.has(option.value);
+      option.disabled = disabledTypes.has(option.value);
+    });
+  });
+}
+
+function renderKnowledgeMetadataManager() {
+  const metadata = loadKnowledgeMetadata();
+  const disabledTypes = new Set(metadata.disabledTypes || []);
+  const items = state.items.filter((item) => item.category === "knowledge");
+  const renderValues = (kind, field) => {
+    const counts = new Map();
+    items.flatMap((item) => normalizeList(item[field]).split(", ")).filter(Boolean).forEach((value) => counts.set(value, (counts.get(value) || 0) + 1));
+    return counts.size ? [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([value, count]) => `<span class="metadata-chip"><span>${escapeHtml(value)} <small>${count}</small></span><button data-metadata-action="delete" data-metadata-kind="${kind}" data-metadata-value="${escapeHtml(value)}" type="button">删除</button></span>`).join("") : '<span class="metadata-empty">暂无内容</span>';
+  };
+  const typeRows = Object.entries(knowledgeTypeLabels).map(([value, label]) => `<span class="metadata-chip ${disabledTypes.has(value) ? "disabled" : ""}"><span>${escapeHtml(label)}</span><button data-metadata-action="${disabledTypes.has(value) ? "restore" : "delete"}" data-metadata-kind="type" data-metadata-value="${value}" type="button">${disabledTypes.has(value) ? "恢复" : "停用"}</button></span>`).join("");
+  elements.knowledgeManagerContent.innerHTML = [
+    ["知识类型", typeRows],
+    ["标签", renderValues("tag", "tags")],
+    ["关联项目", renderValues("project", "project")],
+    ["关联人物", renderValues("person", "people")],
+  ].map(([title, content]) => `<section><h3>${title}</h3><div class="metadata-chip-list">${content}</div></section>`).join("");
+}
+
+function removeMetadataValue(field, value) {
+  state.items.forEach((item) => {
+    if (item.category !== "knowledge") return;
+    item[field] = normalizeList(item[field]).split(", ").filter((entry) => entry && entry.toLowerCase() !== value.toLowerCase()).join(", ");
+  });
+}
+
 function renderKnowledgeSuggestions() {
   const knowledgeItems = state.items.filter((item) => item.category === "knowledge");
   const collect = (field) => [...new Set(knowledgeItems.flatMap((item) => normalizeList(item[field]).split(", ")).filter(Boolean))].sort();
@@ -258,6 +302,50 @@ function renderKnowledgeSuggestions() {
   elements.tagSuggestions.innerHTML = renderOptions(collect("tags"));
   elements.projectSuggestions.innerHTML = renderOptions(collect("project"));
   elements.peopleSuggestions.innerHTML = renderOptions(collect("people"));
+}
+
+function inferKnowledgeMetadata(title, body, currentItemId = "") {
+  const text = `${title || ""} ${body || ""}`.trim();
+  if (!text) return [];
+  const lowerText = text.toLowerCase();
+  const suggestions = [];
+  const add = (kind, value, label = value) => {
+    if (value && !suggestions.some((entry) => entry.kind === kind && entry.value.toLowerCase() === value.toLowerCase())) suggestions.push({ kind, value, label });
+  };
+  const typeRules = [
+    ["person", /人物|作者|同事|朋友|室友|客户|负责人|备注/],
+    ["decision", /决定|决策|结论|选择|确定|方案/],
+    ["method", /方法|步骤|流程|教程|经验|技巧|怎么做/],
+    ["project-memory", /项目|进度|交付|上线|需求|版本/],
+    ["concept", /概念|原理|定义|机制|为什么/],
+    ["source-summary", /资料|摘要|会议|视频|文章|记录/],
+  ];
+  const matchedType = typeRules.find(([, pattern]) => pattern.test(text));
+  if (matchedType) add("type", matchedType[0], knowledgeTypeLabels[matchedType[0]]);
+
+  const knowledgeItems = state.items.filter((item) => item.category === "knowledge" && item.id !== currentItemId);
+  [["tag", "tags"], ["project", "project"], ["person", "people"]].forEach(([kind, field]) => {
+    const values = [...new Set(knowledgeItems.flatMap((item) => normalizeList(item[field]).split(", ")).filter(Boolean))];
+    values.filter((value) => lowerText.includes(value.toLowerCase())).slice(0, 5).forEach((value) => add(kind, value));
+  });
+  [...text.matchAll(/项目\s*[A-Za-z0-9_-]{1,12}/g)].slice(0, 3).forEach((match) => add("project", match[0].replace(/\s+/g, "")));
+  ["AI", "知识库", "工作台", "电商", "摄影", "写作", "决策", "流程", "方法", "经验"].filter((tag) => lowerText.includes(tag.toLowerCase())).forEach((tag) => add("tag", tag));
+  if (matchedType?.[0] === "person" && title?.trim()) add("person", title.trim().replace(/[（(].*$/, "").trim());
+  return suggestions;
+}
+
+function renderInferredKnowledgeSuggestions() {
+  const item = state.items.find((entry) => entry.id === state.selectedId);
+  if (!item || item.category !== "knowledge") return;
+  const suggestions = inferKnowledgeMetadata(elements.itemTitle.value, elements.itemBody.value, item.id).filter((suggestion) => {
+    if (suggestion.kind === "type") return elements.itemKnowledgeType.value !== suggestion.value;
+    const field = suggestion.kind === "tag" ? elements.itemTags : suggestion.kind === "project" ? elements.itemProject : elements.itemPeople;
+    return !normalizeList(field.value).toLowerCase().split(", ").includes(suggestion.value.toLowerCase());
+  });
+  const labels = { type: "类型", tag: "标签", project: "项目", person: "人物" };
+  elements.knowledgeSuggestionList.innerHTML = suggestions.length
+    ? suggestions.map((suggestion) => `<button type="button" data-suggestion-kind="${suggestion.kind}" data-suggestion-value="${escapeHtml(suggestion.value)}"><span>${labels[suggestion.kind]}</span>${escapeHtml(suggestion.label)}</button>`).join("")
+    : '<span class="knowledge-suggestion-empty">暂未识别出新建议，可补充正文后重新识别。</span>';
 }
 
 function renderKnowledgeLinks(item) {
@@ -417,6 +505,10 @@ function initializeKnowledgeGraph(canvas, nodes, edges) {
         node.x += node.velocityX;
         node.y += node.velocityY;
       }
+      const horizontalLimit = Math.max(40, (view.width / 2 - 34) / view.scale);
+      const verticalLimit = Math.max(40, (view.height / 2 - 24) / view.scale);
+      node.x = Math.max(-horizontalLimit, Math.min(horizontalLimit, node.x));
+      node.y = Math.max(-verticalLimit, Math.min(verticalLimit, node.y));
     });
 
     context.clearRect(0, 0, view.width, view.height);
@@ -514,6 +606,7 @@ function renderCategory() {
   document.body.classList.toggle("settings-view", state.category === SETTINGS_CATEGORY);
   elements.knowledgeFilters.hidden = state.category !== "knowledge";
   elements.knowledgeSummary.hidden = state.category !== "knowledge";
+  renderKnowledgeTypeOptions();
   renderKnowledgeGraph();
   renderNav();
   renderItems();
@@ -548,6 +641,7 @@ function renderDetail() {
   elements.itemProject.value = item.project || "";
   elements.itemPeople.value = item.people || "";
   elements.itemKnowledgeStatus.value = item.knowledgeStatus || "inbox";
+  if (isKnowledge) renderInferredKnowledgeSuggestions();
   renderKnowledgeLinks(item);
 }
 
@@ -778,6 +872,30 @@ elements.knowledgeLinksList.addEventListener("click", (event) => {
   if (link) selectItem(link.dataset.knowledgeLink);
 });
 
+let knowledgeSuggestionTimer = null;
+[elements.itemTitle, elements.itemBody].forEach((field) => field.addEventListener("input", () => {
+  if (state.category !== "knowledge") return;
+  window.clearTimeout(knowledgeSuggestionTimer);
+  knowledgeSuggestionTimer = window.setTimeout(renderInferredKnowledgeSuggestions, 500);
+}));
+
+elements.refreshKnowledgeSuggestions.addEventListener("click", renderInferredKnowledgeSuggestions);
+
+elements.knowledgeSuggestionList.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-suggestion-kind]");
+  if (!button) return;
+  const kind = button.dataset.suggestionKind;
+  const value = button.dataset.suggestionValue;
+  if (kind === "type") {
+    elements.itemKnowledgeType.value = value;
+  } else {
+    const field = kind === "tag" ? elements.itemTags : kind === "project" ? elements.itemProject : elements.itemPeople;
+    field.value = normalizeList(`${field.value}, ${value}`);
+  }
+  renderInferredKnowledgeSuggestions();
+  showToast("建议已采用，保存后生效");
+});
+
 elements.knowledgeContextButton.addEventListener("click", async () => {
   await navigator.clipboard.writeText(buildKnowledgeContext());
   showToast("AI 背景包已复制");
@@ -796,6 +914,42 @@ elements.knowledgeTypeFilter.addEventListener("change", (event) => {
 elements.knowledgeStatusFilter.addEventListener("change", (event) => {
   state.knowledgeStatusFilter = event.target.value;
   renderItems();
+});
+
+elements.knowledgeManageButton.addEventListener("click", () => {
+  if (!state.editing) return;
+  renderKnowledgeMetadataManager();
+  elements.knowledgeManagerDialog.showModal();
+});
+
+elements.closeKnowledgeManager.addEventListener("click", () => elements.knowledgeManagerDialog.close());
+
+elements.knowledgeManagerContent.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-metadata-action]");
+  if (!button) return;
+  const { metadataAction: action, metadataKind: kind, metadataValue: value } = button.dataset;
+  const metadata = loadKnowledgeMetadata();
+  metadata.disabledTypes = metadata.disabledTypes || [];
+  if (kind === "type") {
+    if (action === "restore") metadata.disabledTypes = metadata.disabledTypes.filter((entry) => entry !== value);
+    else {
+      if (!window.confirm(`停用“${knowledgeTypeLabels[value]}”并清空已有引用吗？`)) return;
+      if (!metadata.disabledTypes.includes(value)) metadata.disabledTypes.push(value);
+      state.items.forEach((item) => { if (item.category === "knowledge" && item.knowledgeType === value) item.knowledgeType = ""; });
+    }
+    localStorage.setItem(KNOWLEDGE_METADATA_STORAGE, JSON.stringify(metadata));
+  } else {
+    if (!window.confirm(`从全部知识中删除“${value}”吗？`)) return;
+    const field = kind === "tag" ? "tags" : kind === "project" ? "project" : "people";
+    removeMetadataValue(field, value);
+  }
+  saveItems();
+  renderKnowledgeTypeOptions();
+  renderKnowledgeMetadataManager();
+  renderItems();
+  renderKnowledgeGraph();
+  renderDetail();
+  showToast("知识字段已更新");
 });
 
 document.querySelectorAll(".segment").forEach((button) => {
