@@ -68,6 +68,15 @@
                 <option value="source-summary">资料摘要</option>
               </select>
             </label>
+            <label>关联项
+              <select id="knowledgeProjectFilter"><option value="all">全部关联项</option></select>
+            </label>
+            <label>标签
+              <select id="knowledgeTagFilter"><option value="all">全部标签</option></select>
+            </label>
+            <label>关联人物
+              <select id="knowledgePeopleFilter"><option value="all">全部人物</option></select>
+            </label>
             <label>知识状态
               <select id="knowledgeStatusFilter">
                 <option value="all">全部状态</option>
@@ -159,7 +168,7 @@
               </label>
               <div class="form-grid">
                 <label>标签<input id="itemTags" list="tagSuggestions" placeholder="例如：项目A, 决策" /></label>
-                <label>关联项目<input id="itemProject" list="projectSuggestions" placeholder="例如：项目A" /></label>
+                <label>关联项<input id="itemProject" list="projectSuggestions" placeholder="例如：项目A、主题或领域" /></label>
               </div>
               <label>关联人物<input id="itemPeople" list="peopleSuggestions" placeholder="例如：雷澍" /></label>
               <label>知识状态
@@ -222,7 +231,7 @@
     <dialog id="knowledgeManagerDialog" class="knowledge-manager-dialog">
       <div class="dialog-heading">
         <span class="brand-mark small">04</span>
-        <div><strong>知识字段管理</strong><p>停用知识类型，或全局删除不用的标签、项目和人物。</p></div>
+        <div><strong>知识检索项管理</strong><p>点击栏目展开，可新增、删除、停用或恢复检索选项。</p></div>
       </div>
       <div id="knowledgeManagerContent" class="knowledge-manager-content"></div>
       <div class="dialog-actions"><button id="closeKnowledgeManager" class="button primary" type="button">完成</button></div>

@@ -62,6 +62,9 @@ const state = {
   filter: "all",
   search: "",
   knowledgeTypeFilter: "all",
+  knowledgeProjectFilter: "all",
+  knowledgeTagFilter: "all",
+  knowledgePeopleFilter: "all",
   knowledgeStatusFilter: "all",
   editing: false,
   pendingCategory: null,
@@ -74,7 +77,7 @@ const state = {
 const elements = Object.fromEntries([
   "categoryNav", "categoryEyebrow", "categoryTitle", "categoryDescription", "itemList", "emptyState", "taskFilters",
   "detailPanel", "detailEmpty", "detailForm", "detailCategory", "itemTitle", "itemStatus", "itemDate",
-  "itemBody", "knowledgeFields", "itemKnowledgeType", "itemTags", "itemProject", "itemPeople", "itemKnowledgeStatus", "knowledgeSuggestions", "knowledgeSuggestionList", "refreshKnowledgeSuggestions", "knowledgeLinks", "knowledgeLinksList", "knowledgeGraph", "knowledgeGraphCanvas", "knowledgeContextButton", "knowledgeManageButton", "knowledgeManagerDialog", "knowledgeManagerContent", "closeKnowledgeManager", "tagSuggestions", "projectSuggestions", "peopleSuggestions", "knowledgeFilters", "knowledgeSummary", "knowledgeTypeFilter", "knowledgeStatusFilter", "newItemButton", "deleteButton", "searchInput", "editModeButton", "modeLabel", "shareButton",
+  "itemBody", "knowledgeFields", "itemKnowledgeType", "itemTags", "itemProject", "itemPeople", "itemKnowledgeStatus", "knowledgeSuggestions", "knowledgeSuggestionList", "refreshKnowledgeSuggestions", "knowledgeLinks", "knowledgeLinksList", "knowledgeGraph", "knowledgeGraphCanvas", "knowledgeContextButton", "knowledgeManageButton", "knowledgeManagerDialog", "knowledgeManagerContent", "closeKnowledgeManager", "tagSuggestions", "projectSuggestions", "peopleSuggestions", "knowledgeFilters", "knowledgeSummary", "knowledgeTypeFilter", "knowledgeProjectFilter", "knowledgeTagFilter", "knowledgePeopleFilter", "knowledgeStatusFilter", "newItemButton", "deleteButton", "searchInput", "editModeButton", "modeLabel", "shareButton",
   "accessDialog", "accessForm", "accessTitle", "accessDescription", "accessKey", "accessError", "cancelAccess",
   "weeklyCount", "toast", "storageNotice", "protectedDialog", "protectedForm", "protectedTitle",
   "protectedDescription", "protectedPasswordLabel", "protectedPassword", "recoveryAnswerLabel", "recoveryAnswer",
@@ -225,8 +228,11 @@ function visibleItems() {
     const searchable = `${item.title} ${item.body} ${item.tags || ""} ${item.project || ""} ${item.people || ""}`.toLowerCase();
     const searchMatch = !query || searchable.includes(query);
     const typeMatch = state.category !== "knowledge" || state.knowledgeTypeFilter === "all" || item.knowledgeType === state.knowledgeTypeFilter;
+    const projectMatch = state.category !== "knowledge" || state.knowledgeProjectFilter === "all" || normalizeList(item.project).split(", ").includes(state.knowledgeProjectFilter);
+    const tagMatch = state.category !== "knowledge" || state.knowledgeTagFilter === "all" || normalizeList(item.tags).split(", ").includes(state.knowledgeTagFilter);
+    const peopleMatch = state.category !== "knowledge" || state.knowledgePeopleFilter === "all" || normalizeList(item.people).split(", ").includes(state.knowledgePeopleFilter);
     const knowledgeStatusMatch = state.category !== "knowledge" || state.knowledgeStatusFilter === "all" || normalizeKnowledgeStatus(item.knowledgeStatus) === state.knowledgeStatusFilter;
-    return categoryMatch && filterMatch && searchMatch && typeMatch && knowledgeStatusMatch;
+    return categoryMatch && filterMatch && searchMatch && typeMatch && projectMatch && tagMatch && peopleMatch && knowledgeStatusMatch;
   });
 }
 
@@ -257,41 +263,82 @@ function normalizeList(value) {
 function normalizeKnowledgeStatus(value) {
   if (value === "current" || value === "confirmed") return "confirmed";
   if (value === "draft" || value === "outdated") return "outdated";
+  if (loadKnowledgeMetadata().customStatuses.some((entry) => entry.id === value)) return value;
   return "review";
 }
 
 function loadKnowledgeMetadata() {
-  try { return JSON.parse(localStorage.getItem(KNOWLEDGE_METADATA_STORAGE)) || { disabledTypes: [] }; }
-  catch { return { disabledTypes: [] }; }
+  const defaults = { disabledTypes: [], disabledStatuses: [], customTypes: [], customStatuses: [], tags: [], projects: [], people: [] };
+  try { return { ...defaults, ...(JSON.parse(localStorage.getItem(KNOWLEDGE_METADATA_STORAGE)) || {}) }; }
+  catch { return defaults; }
+}
+
+function metadataEntries(kind) {
+  const metadata = loadKnowledgeMetadata();
+  const base = kind === "type" ? Object.entries(knowledgeTypeLabels).map(([id, label]) => ({ id, label, custom: false })) : Object.entries(knowledgeStatusLabels).map(([id, label]) => ({ id, label, custom: false }));
+  const custom = kind === "type" ? metadata.customTypes : metadata.customStatuses;
+  const disabled = new Set(kind === "type" ? metadata.disabledTypes : metadata.disabledStatuses);
+  return [...base, ...custom.map((entry) => ({ ...entry, custom: true }))].filter((entry) => !disabled.has(entry.id));
+}
+
+function knowledgeTypeLabel(value) {
+  return metadataEntries("type").find((entry) => entry.id === value)?.label || knowledgeTypeLabels[value] || "待分类";
+}
+
+function knowledgeStatusLabel(value) {
+  const normalized = normalizeKnowledgeStatus(value);
+  return metadataEntries("status").find((entry) => entry.id === normalized)?.label || knowledgeStatusLabels[normalized] || "待验证";
+}
+
+function metadataValues(field, catalogKey) {
+  const metadata = loadKnowledgeMetadata();
+  const used = state.items.filter((item) => item.category === "knowledge").flatMap((item) => normalizeList(item[field]).split(", ")).filter(Boolean);
+  return [...new Set([...(metadata[catalogKey] || []), ...used])].sort((a, b) => a.localeCompare(b));
+}
+
+function setSelectOptions(select, entries, allLabel) {
+  const current = select.value;
+  select.innerHTML = `<option value="all">${allLabel}</option>${entries.map((entry) => `<option value="${escapeHtml(entry.id ?? entry)}">${escapeHtml(entry.label ?? entry)}</option>`).join("")}`;
+  select.value = [...select.options].some((option) => option.value === current) ? current : "all";
 }
 
 function renderKnowledgeTypeOptions() {
-  const disabledTypes = new Set(loadKnowledgeMetadata().disabledTypes || []);
-  [elements.itemKnowledgeType, elements.knowledgeTypeFilter].forEach((select) => {
-    [...select.options].forEach((option) => {
-      if (!option.value || option.value === "all") return;
-      option.hidden = disabledTypes.has(option.value);
-      option.disabled = disabledTypes.has(option.value);
-    });
-  });
+  const types = metadataEntries("type");
+  const statuses = metadataEntries("status");
+  const currentType = elements.itemKnowledgeType.value;
+  elements.itemKnowledgeType.innerHTML = '<option value="">待分类</option>' + types.map((entry) => `<option value="${escapeHtml(entry.id)}">${escapeHtml(entry.label)}</option>`).join("");
+  elements.itemKnowledgeType.value = types.some((entry) => entry.id === currentType) ? currentType : "";
+  setSelectOptions(elements.knowledgeTypeFilter, types, "全部类型");
+  const currentStatus = elements.itemKnowledgeStatus.value;
+  elements.itemKnowledgeStatus.innerHTML = statuses.map((entry) => `<option value="${escapeHtml(entry.id)}">${escapeHtml(entry.label)}</option>`).join("");
+  elements.itemKnowledgeStatus.value = statuses.some((entry) => entry.id === currentStatus) ? currentStatus : "review";
+  setSelectOptions(elements.knowledgeStatusFilter, statuses, "全部状态");
+  setSelectOptions(elements.knowledgeProjectFilter, metadataValues("project", "projects"), "全部关联项");
+  setSelectOptions(elements.knowledgeTagFilter, metadataValues("tags", "tags"), "全部标签");
+  setSelectOptions(elements.knowledgePeopleFilter, metadataValues("people", "people"), "全部人物");
 }
 
 function renderKnowledgeMetadataManager() {
   const metadata = loadKnowledgeMetadata();
-  const disabledTypes = new Set(metadata.disabledTypes || []);
-  const items = state.items.filter((item) => item.category === "knowledge");
-  const renderValues = (kind, field) => {
-    const counts = new Map();
-    items.flatMap((item) => normalizeList(item[field]).split(", ")).filter(Boolean).forEach((value) => counts.set(value, (counts.get(value) || 0) + 1));
-    return counts.size ? [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([value, count]) => `<span class="metadata-chip"><span>${escapeHtml(value)} <small>${count}</small></span><button data-metadata-action="delete" data-metadata-kind="${kind}" data-metadata-value="${escapeHtml(value)}" type="button">删除</button></span>`).join("") : '<span class="metadata-empty">暂无内容</span>';
-  };
-  const typeRows = Object.entries(knowledgeTypeLabels).map(([value, label]) => `<span class="metadata-chip ${disabledTypes.has(value) ? "disabled" : ""}"><span>${escapeHtml(label)}</span><button data-metadata-action="${disabledTypes.has(value) ? "restore" : "delete"}" data-metadata-kind="type" data-metadata-value="${value}" type="button">${disabledTypes.has(value) ? "恢复" : "停用"}</button></span>`).join("");
-  elements.knowledgeManagerContent.innerHTML = [
-    ["知识类型", typeRows],
-    ["标签", renderValues("tag", "tags")],
-    ["关联项目", renderValues("project", "project")],
-    ["关联人物", renderValues("person", "people")],
-  ].map(([title, content]) => `<section><h3>${title}</h3><div class="metadata-chip-list">${content}</div></section>`).join("");
+  const disabledTypes = new Set(metadata.disabledTypes);
+  const disabledStatuses = new Set(metadata.disabledStatuses);
+  const renderDefinitions = (kind, baseLabels, customEntries, disabled) => [...Object.entries(baseLabels).map(([id, label]) => ({ id, label, custom: false })), ...customEntries.map((entry) => ({ ...entry, custom: true }))]
+    .map((entry) => `<span class="metadata-chip ${disabled.has(entry.id) ? "disabled" : ""}"><span>${escapeHtml(entry.label)}</span><button data-metadata-action="${disabled.has(entry.id) ? "restore" : "delete"}" data-metadata-kind="${kind}" data-metadata-value="${escapeHtml(entry.id)}" type="button">${disabled.has(entry.id) ? "恢复" : entry.custom ? "删除" : "停用"}</button></span>`).join("");
+  const renderValues = (kind, field, catalogKey) => metadataValues(field, catalogKey).map((value) => `<span class="metadata-chip"><span>${escapeHtml(value)}</span><button data-metadata-action="delete" data-metadata-kind="${kind}" data-metadata-value="${escapeHtml(value)}" type="button">删除</button></span>`).join("") || '<span class="metadata-empty">暂无选项</span>';
+  const groups = [
+    ["type", "知识类型", "例如：工具说明", renderDefinitions("type", knowledgeTypeLabels, metadata.customTypes, disabledTypes)],
+    ["project", "关联项", "例如：项目A、摄影", renderValues("project", "project", "projects")],
+    ["tag", "标签", "例如：决策、方法", renderValues("tag", "tags", "tags")],
+    ["person", "关联人物", "例如：方鹏", renderValues("person", "people", "people")],
+    ["status", "知识状态", "例如：需更新", renderDefinitions("status", knowledgeStatusLabels, metadata.customStatuses, disabledStatuses)],
+  ];
+  elements.knowledgeManagerContent.innerHTML = groups.map(([kind, title, placeholder, content], index) => `
+    <details class="metadata-group" ${index === 0 ? "open" : ""}>
+      <summary><strong>${title}</strong><span>点击展开管理</span></summary>
+      <form class="metadata-add-form" data-metadata-add="${kind}"><input name="metadataValue" placeholder="${placeholder}" required /><button class="button primary" type="submit">新增</button></form>
+      <div class="metadata-chip-list">${content}</div>
+    </details>
+  `).join("");
 }
 
 function removeMetadataValue(field, value) {
@@ -303,11 +350,12 @@ function removeMetadataValue(field, value) {
 
 function renderKnowledgeSuggestions() {
   const knowledgeItems = state.items.filter((item) => item.category === "knowledge");
-  const collect = (field) => [...new Set(knowledgeItems.flatMap((item) => normalizeList(item[field]).split(", ")).filter(Boolean))].sort();
+  const metadata = loadKnowledgeMetadata();
+  const collect = (field, catalogKey) => [...new Set([...(metadata[catalogKey] || []), ...knowledgeItems.flatMap((item) => normalizeList(item[field]).split(", ")).filter(Boolean)])].sort();
   const renderOptions = (values) => values.map((value) => `<option value="${escapeHtml(value)}"></option>`).join("");
-  elements.tagSuggestions.innerHTML = renderOptions(collect("tags"));
-  elements.projectSuggestions.innerHTML = renderOptions(collect("project"));
-  elements.peopleSuggestions.innerHTML = renderOptions(collect("people"));
+  elements.tagSuggestions.innerHTML = renderOptions(collect("tags", "tags"));
+  elements.projectSuggestions.innerHTML = renderOptions(collect("project", "projects"));
+  elements.peopleSuggestions.innerHTML = renderOptions(collect("people", "people"));
 }
 
 function inferKnowledgeMetadata(title, body, currentItemId = "") {
@@ -368,7 +416,7 @@ function renderKnowledgeLinks(item) {
     return sharedTag || sharedProject || sharedPerson;
   }).slice(0, 8);
   elements.knowledgeLinksList.innerHTML = related.length
-    ? related.map((candidate) => `<button class="knowledge-link" data-knowledge-link="${candidate.id}" type="button"><strong>${escapeHtml(candidate.title)}</strong><span>${escapeHtml(knowledgeStatusLabels[normalizeKnowledgeStatus(candidate.knowledgeStatus)])}</span></button>`).join("")
+    ? related.map((candidate) => `<button class="knowledge-link" data-knowledge-link="${candidate.id}" type="button"><strong>${escapeHtml(candidate.title)}</strong><span>${escapeHtml(knowledgeStatusLabel(candidate.knowledgeStatus))}</span></button>`).join("")
     : '<span class="knowledge-links-empty">填写相同的标签、项目或人物后，这里会显示相关知识。</span>';
 }
 
@@ -565,8 +613,8 @@ function buildKnowledgeContext() {
     .sort((a, b) => statusOrder[normalizeKnowledgeStatus(a.knowledgeStatus)] - statusOrder[normalizeKnowledgeStatus(b.knowledgeStatus)]);
   const sections = items.map((item, index) => [
     `## ${String(index + 1).padStart(2, "0")} ${item.title || "未命名知识"}`,
-    `- 类型：${knowledgeTypeLabels[item.knowledgeType] || "待分类"}`,
-    `- 状态：${knowledgeStatusLabels[normalizeKnowledgeStatus(item.knowledgeStatus)]}`,
+    `- 类型：${knowledgeTypeLabel(item.knowledgeType)}`,
+    `- 状态：${knowledgeStatusLabel(item.knowledgeStatus)}`,
     item.project ? `- 关联项目：${item.project}` : "",
     item.people ? `- 关联人物：${item.people}` : "",
     item.tags ? `- 标签：${item.tags}` : "",
@@ -591,7 +639,7 @@ function renderItems() {
     <button class="item-card ${item.id === state.selectedId ? "selected" : ""}" data-id="${item.id}" type="button">
       <span class="item-card-main">
         <span class="item-title">${escapeHtml(item.title)}</span>
-        ${item.category === "knowledge" ? `<span class="knowledge-card-meta"><span>${escapeHtml(knowledgeTypeLabels[item.knowledgeType] || "待分类")}</span><span class="knowledge-state ${normalizeKnowledgeStatus(item.knowledgeStatus)}">${escapeHtml(knowledgeStatusLabels[normalizeKnowledgeStatus(item.knowledgeStatus)])}</span>${item.tags ? `<span># ${escapeHtml(item.tags)}</span>` : ""}</span>` : ""}
+        ${item.category === "knowledge" ? `<span class="knowledge-card-meta"><span>${escapeHtml(knowledgeTypeLabel(item.knowledgeType))}</span><span class="knowledge-state ${normalizeKnowledgeStatus(item.knowledgeStatus)}">${escapeHtml(knowledgeStatusLabel(item.knowledgeStatus))}</span>${item.tags ? `<span># ${escapeHtml(item.tags)}</span>` : ""}</span>` : ""}
         <span class="item-preview">${escapeHtml(item.body || "暂无详细内容")}</span>
       </span>
       <span class="item-meta">
@@ -923,6 +971,15 @@ elements.knowledgeStatusFilter.addEventListener("change", (event) => {
   renderItems();
 });
 
+[
+  [elements.knowledgeProjectFilter, "knowledgeProjectFilter"],
+  [elements.knowledgeTagFilter, "knowledgeTagFilter"],
+  [elements.knowledgePeopleFilter, "knowledgePeopleFilter"],
+].forEach(([select, stateKey]) => select.addEventListener("change", (event) => {
+  state[stateKey] = event.target.value;
+  renderItems();
+}));
+
 elements.knowledgeManageButton.addEventListener("click", () => {
   if (!state.editing) return;
   renderKnowledgeMetadataManager();
@@ -936,20 +993,30 @@ elements.knowledgeManagerContent.addEventListener("click", (event) => {
   if (!button) return;
   const { metadataAction: action, metadataKind: kind, metadataValue: value } = button.dataset;
   const metadata = loadKnowledgeMetadata();
-  metadata.disabledTypes = metadata.disabledTypes || [];
-  if (kind === "type") {
-    if (action === "restore") metadata.disabledTypes = metadata.disabledTypes.filter((entry) => entry !== value);
+  if (kind === "type" || kind === "status") {
+    const disabledKey = kind === "type" ? "disabledTypes" : "disabledStatuses";
+    const customKey = kind === "type" ? "customTypes" : "customStatuses";
+    const label = kind === "type" ? knowledgeTypeLabel(value) : knowledgeStatusLabel(value);
+    const isCustom = metadata[customKey].some((entry) => entry.id === value);
+    if (action === "restore") metadata[disabledKey] = metadata[disabledKey].filter((entry) => entry !== value);
     else {
-      if (!window.confirm(`停用“${knowledgeTypeLabels[value]}”并清空已有引用吗？`)) return;
-      if (!metadata.disabledTypes.includes(value)) metadata.disabledTypes.push(value);
-      state.items.forEach((item) => { if (item.category === "knowledge" && item.knowledgeType === value) item.knowledgeType = ""; });
+      if (!window.confirm(`${isCustom ? "删除" : "停用"}“${label}”并清空已有引用吗？`)) return;
+      if (isCustom) metadata[customKey] = metadata[customKey].filter((entry) => entry.id !== value);
+      else if (!metadata[disabledKey].includes(value)) metadata[disabledKey].push(value);
+      state.items.forEach((item) => {
+        if (item.category !== "knowledge") return;
+        if (kind === "type" && item.knowledgeType === value) item.knowledgeType = "";
+        if (kind === "status" && normalizeKnowledgeStatus(item.knowledgeStatus) === value) item.knowledgeStatus = "review";
+      });
     }
-    localStorage.setItem(KNOWLEDGE_METADATA_STORAGE, JSON.stringify(metadata));
   } else {
     if (!window.confirm(`从全部知识中删除“${value}”吗？`)) return;
     const field = kind === "tag" ? "tags" : kind === "project" ? "project" : "people";
+    const catalogKey = kind === "tag" ? "tags" : kind === "project" ? "projects" : "people";
+    metadata[catalogKey] = metadata[catalogKey].filter((entry) => entry.toLowerCase() !== value.toLowerCase());
     removeMetadataValue(field, value);
   }
+  localStorage.setItem(KNOWLEDGE_METADATA_STORAGE, JSON.stringify(metadata));
   saveItems();
   renderKnowledgeTypeOptions();
   renderKnowledgeMetadataManager();
@@ -957,6 +1024,31 @@ elements.knowledgeManagerContent.addEventListener("click", (event) => {
   renderKnowledgeGraph();
   renderDetail();
   showToast("知识字段已更新");
+});
+
+elements.knowledgeManagerContent.addEventListener("submit", (event) => {
+  const form = event.target.closest("[data-metadata-add]");
+  if (!form) return;
+  event.preventDefault();
+  const kind = form.dataset.metadataAdd;
+  const value = new FormData(form).get("metadataValue").trim();
+  if (!value) return;
+  const metadata = loadKnowledgeMetadata();
+  if (kind === "type" || kind === "status") {
+    const customKey = kind === "type" ? "customTypes" : "customStatuses";
+    const baseLabels = kind === "type" ? Object.values(knowledgeTypeLabels) : Object.values(knowledgeStatusLabels);
+    const existing = [...baseLabels, ...metadata[customKey].map((entry) => entry.label)].some((label) => label.toLowerCase() === value.toLowerCase());
+    if (existing) { showToast("该选项已存在"); return; }
+    metadata[customKey].push({ id: `custom-${kind}-${crypto.randomUUID()}`, label: value });
+  } else {
+    const catalogKey = kind === "tag" ? "tags" : kind === "project" ? "projects" : "people";
+    if (!metadata[catalogKey].some((entry) => entry.toLowerCase() === value.toLowerCase())) metadata[catalogKey].push(value);
+  }
+  localStorage.setItem(KNOWLEDGE_METADATA_STORAGE, JSON.stringify(metadata));
+  void saveRemoteState();
+  renderKnowledgeTypeOptions();
+  renderKnowledgeMetadataManager();
+  showToast("新选项已增加");
 });
 
 document.querySelectorAll(".segment").forEach((button) => {
@@ -996,6 +1088,7 @@ elements.detailForm.addEventListener("submit", (event) => {
   }
   saveItems();
   renderItems();
+  if (item.category === "knowledge") renderKnowledgeTypeOptions();
   if (item.category === "knowledge") renderKnowledgeGraph();
   showToast("内容已保存");
 });
