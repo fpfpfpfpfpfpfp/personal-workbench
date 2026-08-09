@@ -22,7 +22,7 @@ const knowledgeTypeLabels = {
   "project-memory": "项目记忆", person: "人物信息", concept: "概念与原理",
   method: "方法与经验", decision: "决策记录", "source-summary": "资料摘要",
 };
-const knowledgeStatusLabels = { inbox: "待整理", current: "当前结论", draft: "历史草稿", question: "待确认问题" };
+const knowledgeStatusLabels = { confirmed: "已确认", review: "待验证", outdated: "已过时" };
 
 const categories = [
   { id: "inbox", index: "00", title: "收件箱", eyebrow: "快速收集", description: "临时接住待判断、待整理的信息，再定期分配到正确位置。" },
@@ -72,7 +72,7 @@ const state = {
 };
 
 const elements = Object.fromEntries([
-  "categoryNav", "categoryEyebrow", "categoryTitle", "categoryDescription", "itemList", "emptyState",
+  "categoryNav", "categoryEyebrow", "categoryTitle", "categoryDescription", "itemList", "emptyState", "taskFilters",
   "detailPanel", "detailEmpty", "detailForm", "detailCategory", "itemTitle", "itemStatus", "itemDate",
   "itemBody", "knowledgeFields", "itemKnowledgeType", "itemTags", "itemProject", "itemPeople", "itemKnowledgeStatus", "knowledgeSuggestions", "knowledgeSuggestionList", "refreshKnowledgeSuggestions", "knowledgeLinks", "knowledgeLinksList", "knowledgeGraph", "knowledgeGraphCanvas", "knowledgeContextButton", "knowledgeManageButton", "knowledgeManagerDialog", "knowledgeManagerContent", "closeKnowledgeManager", "tagSuggestions", "projectSuggestions", "peopleSuggestions", "knowledgeFilters", "knowledgeSummary", "knowledgeTypeFilter", "knowledgeStatusFilter", "newItemButton", "deleteButton", "searchInput", "editModeButton", "modeLabel", "shareButton",
   "accessDialog", "accessForm", "accessTitle", "accessDescription", "accessKey", "accessError", "cancelAccess",
@@ -221,11 +221,11 @@ function visibleItems() {
   const query = state.search.trim().toLowerCase();
   return state.items.filter((item) => {
     const categoryMatch = item.category === state.category;
-    const filterMatch = state.filter === "all" || item.status === state.filter;
+    const filterMatch = state.category === "knowledge" || state.filter === "all" || item.status === state.filter;
     const searchable = `${item.title} ${item.body} ${item.tags || ""} ${item.project || ""} ${item.people || ""}`.toLowerCase();
     const searchMatch = !query || searchable.includes(query);
     const typeMatch = state.category !== "knowledge" || state.knowledgeTypeFilter === "all" || item.knowledgeType === state.knowledgeTypeFilter;
-    const knowledgeStatusMatch = state.category !== "knowledge" || state.knowledgeStatusFilter === "all" || (item.knowledgeStatus || "inbox") === state.knowledgeStatusFilter;
+    const knowledgeStatusMatch = state.category !== "knowledge" || state.knowledgeStatusFilter === "all" || normalizeKnowledgeStatus(item.knowledgeStatus) === state.knowledgeStatusFilter;
     return categoryMatch && filterMatch && searchMatch && typeMatch && knowledgeStatusMatch;
   });
 }
@@ -252,6 +252,12 @@ function normalizeList(value) {
       return true;
     })
     .join(", ");
+}
+
+function normalizeKnowledgeStatus(value) {
+  if (value === "current" || value === "confirmed") return "confirmed";
+  if (value === "draft" || value === "outdated") return "outdated";
+  return "review";
 }
 
 function loadKnowledgeMetadata() {
@@ -362,7 +368,7 @@ function renderKnowledgeLinks(item) {
     return sharedTag || sharedProject || sharedPerson;
   }).slice(0, 8);
   elements.knowledgeLinksList.innerHTML = related.length
-    ? related.map((candidate) => `<button class="knowledge-link" data-knowledge-link="${candidate.id}" type="button"><strong>${escapeHtml(candidate.title)}</strong><span>${escapeHtml(knowledgeStatusLabels[candidate.knowledgeStatus || "inbox"])}</span></button>`).join("")
+    ? related.map((candidate) => `<button class="knowledge-link" data-knowledge-link="${candidate.id}" type="button"><strong>${escapeHtml(candidate.title)}</strong><span>${escapeHtml(knowledgeStatusLabels[normalizeKnowledgeStatus(candidate.knowledgeStatus)])}</span></button>`).join("")
     : '<span class="knowledge-links-empty">填写相同的标签、项目或人物后，这里会显示相关知识。</span>';
 }
 
@@ -554,38 +560,38 @@ function initializeKnowledgeGraph(canvas, nodes, edges) {
 }
 
 function buildKnowledgeContext() {
-  const statusOrder = { current: 0, question: 1, inbox: 2, draft: 3 };
-  const items = state.items.filter((item) => item.category === "knowledge" && (item.knowledgeStatus || "inbox") !== "draft")
-    .sort((a, b) => (statusOrder[a.knowledgeStatus || "inbox"] ?? 9) - (statusOrder[b.knowledgeStatus || "inbox"] ?? 9));
+  const statusOrder = { confirmed: 0, review: 1, outdated: 2 };
+  const items = state.items.filter((item) => item.category === "knowledge" && normalizeKnowledgeStatus(item.knowledgeStatus) !== "outdated")
+    .sort((a, b) => statusOrder[normalizeKnowledgeStatus(a.knowledgeStatus)] - statusOrder[normalizeKnowledgeStatus(b.knowledgeStatus)]);
   const sections = items.map((item, index) => [
     `## ${String(index + 1).padStart(2, "0")} ${item.title || "未命名知识"}`,
     `- 类型：${knowledgeTypeLabels[item.knowledgeType] || "待分类"}`,
-    `- 状态：${knowledgeStatusLabels[item.knowledgeStatus || "inbox"]}`,
+    `- 状态：${knowledgeStatusLabels[normalizeKnowledgeStatus(item.knowledgeStatus)]}`,
     item.project ? `- 关联项目：${item.project}` : "",
     item.people ? `- 关联人物：${item.people}` : "",
     item.tags ? `- 标签：${item.tags}` : "",
     "",
     item.body || "暂无正文",
   ].filter(Boolean).join("\n"));
-  return [`# 04 个人知识库｜AI 背景包`, ``, `生成日期：${today()}`, `说明：优先采用“当前结论”，待确认问题需要核实；历史草稿已排除。`, ``, ...sections].join("\n");
+  return [`# 04 个人知识库｜AI 背景包`, ``, `生成日期：${today()}`, `说明：优先采用“已确认”知识，“待验证”内容需要核实；“已过时”内容已排除。`, ``, ...sections].join("\n");
 }
 
 function renderItems() {
-  const statusOrder = { current: 0, question: 1, inbox: 2, draft: 3 };
+  const statusOrder = { confirmed: 0, review: 1, outdated: 2 };
   const items = visibleItems().sort((a, b) => {
     if (state.category !== "knowledge") return 0;
-    return (statusOrder[a.knowledgeStatus || "inbox"] ?? 9) - (statusOrder[b.knowledgeStatus || "inbox"] ?? 9);
+    return statusOrder[normalizeKnowledgeStatus(a.knowledgeStatus)] - statusOrder[normalizeKnowledgeStatus(b.knowledgeStatus)];
   });
   if (state.category === "knowledge") {
     const knowledgeItems = state.items.filter((item) => item.category === "knowledge");
-    const count = (status) => knowledgeItems.filter((item) => (item.knowledgeStatus || "inbox") === status).length;
-    elements.knowledgeSummary.innerHTML = `<span class="current">当前结论 ${count("current")}</span><span class="question">待确认 ${count("question")}</span><span class="inbox">待整理 ${count("inbox")}</span><span class="draft">历史草稿 ${count("draft")}</span>`;
+    const count = (status) => knowledgeItems.filter((item) => normalizeKnowledgeStatus(item.knowledgeStatus) === status).length;
+    elements.knowledgeSummary.innerHTML = `<span class="confirmed">已确认 ${count("confirmed")}</span><span class="review">待验证 ${count("review")}</span><span class="outdated">已过时 ${count("outdated")}</span>`;
   }
   elements.itemList.innerHTML = items.map((item) => `
     <button class="item-card ${item.id === state.selectedId ? "selected" : ""}" data-id="${item.id}" type="button">
       <span class="item-card-main">
         <span class="item-title">${escapeHtml(item.title)}</span>
-        ${item.category === "knowledge" ? `<span class="knowledge-card-meta"><span>${escapeHtml(knowledgeTypeLabels[item.knowledgeType] || "待分类")}</span><span class="knowledge-state ${item.knowledgeStatus || "inbox"}">${escapeHtml(knowledgeStatusLabels[item.knowledgeStatus || "inbox"])}</span>${item.tags ? `<span># ${escapeHtml(item.tags)}</span>` : ""}</span>` : ""}
+        ${item.category === "knowledge" ? `<span class="knowledge-card-meta"><span>${escapeHtml(knowledgeTypeLabels[item.knowledgeType] || "待分类")}</span><span class="knowledge-state ${normalizeKnowledgeStatus(item.knowledgeStatus)}">${escapeHtml(knowledgeStatusLabels[normalizeKnowledgeStatus(item.knowledgeStatus)])}</span>${item.tags ? `<span># ${escapeHtml(item.tags)}</span>` : ""}</span>` : ""}
         <span class="item-preview">${escapeHtml(item.body || "暂无详细内容")}</span>
       </span>
       <span class="item-meta">
@@ -606,6 +612,7 @@ function renderCategory() {
   document.body.classList.toggle("settings-view", state.category === SETTINGS_CATEGORY);
   elements.knowledgeFilters.hidden = state.category !== "knowledge";
   elements.knowledgeSummary.hidden = state.category !== "knowledge";
+  elements.taskFilters.classList.toggle("knowledge-task-filter", state.category === "knowledge");
   renderKnowledgeTypeOptions();
   renderKnowledgeGraph();
   renderNav();
@@ -640,7 +647,7 @@ function renderDetail() {
   elements.itemTags.value = item.tags || "";
   elements.itemProject.value = item.project || "";
   elements.itemPeople.value = item.people || "";
-  elements.itemKnowledgeStatus.value = item.knowledgeStatus || "inbox";
+  elements.itemKnowledgeStatus.value = normalizeKnowledgeStatus(item.knowledgeStatus);
   if (isKnowledge) renderInferredKnowledgeSuggestions();
   renderKnowledgeLinks(item);
 }

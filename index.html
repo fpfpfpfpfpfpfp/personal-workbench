@@ -44,7 +44,7 @@
             <button id="newItemButton" class="button primary edit-only" type="button">新建内容</button>
           </div>
 
-          <div class="filter-row">
+          <div id="taskFilters" class="filter-row">
             <label class="search-field">
               <span>搜索</span>
               <input id="searchInput" type="search" placeholder="搜索当前目录" />
@@ -71,10 +71,9 @@
             <label>知识状态
               <select id="knowledgeStatusFilter">
                 <option value="all">全部状态</option>
-                <option value="inbox">待整理</option>
-                <option value="current">当前结论</option>
-                <option value="draft">历史草稿</option>
-                <option value="question">待确认问题</option>
+                <option value="confirmed">已确认</option>
+                <option value="review">待验证</option>
+                <option value="outdated">已过时</option>
               </select>
             </label>
             <button id="knowledgeManageButton" class="button secondary knowledge-manage-button edit-only" type="button">管理知识字段</button>
@@ -165,10 +164,9 @@
               <label>关联人物<input id="itemPeople" list="peopleSuggestions" placeholder="例如：雷澍" /></label>
               <label>知识状态
                 <select id="itemKnowledgeStatus">
-                  <option value="inbox">待整理</option>
-                  <option value="current">当前结论</option>
-                  <option value="draft">历史草稿</option>
-                  <option value="question">待确认问题</option>
+                  <option value="confirmed">已确认</option>
+                  <option value="review">待验证</option>
+                  <option value="outdated">已过时</option>
                 </select>
               </label>
               <section id="knowledgeSuggestions" class="knowledge-suggestions edit-only">
