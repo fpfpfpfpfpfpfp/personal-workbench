@@ -64,7 +64,7 @@ const state = {
 const elements = Object.fromEntries([
   "categoryNav", "categoryEyebrow", "categoryTitle", "categoryDescription", "itemList", "emptyState",
   "detailPanel", "detailEmpty", "detailForm", "detailCategory", "itemTitle", "itemStatus", "itemDate",
-  "itemBody", "newItemButton", "deleteButton", "searchInput", "editModeButton", "modeLabel", "shareButton",
+  "itemBody", "knowledgeFields", "itemKnowledgeType", "itemTags", "itemProject", "itemPeople", "itemKnowledgeStatus", "newItemButton", "deleteButton", "searchInput", "editModeButton", "modeLabel", "shareButton",
   "accessDialog", "accessForm", "accessTitle", "accessDescription", "accessKey", "accessError", "cancelAccess",
   "weeklyCount", "toast", "storageNotice", "protectedDialog", "protectedForm", "protectedTitle",
   "protectedDescription", "protectedPasswordLabel", "protectedPassword", "recoveryAnswerLabel", "recoveryAnswer",
@@ -273,6 +273,13 @@ function renderDetail() {
   elements.itemStatus.value = item.status;
   elements.itemDate.value = item.date || "";
   elements.itemBody.value = item.body || "";
+  const isKnowledge = state.category === "knowledge";
+  elements.knowledgeFields.hidden = !isKnowledge;
+  elements.itemKnowledgeType.value = item.knowledgeType || "";
+  elements.itemTags.value = item.tags || "";
+  elements.itemProject.value = item.project || "";
+  elements.itemPeople.value = item.people || "";
+  elements.itemKnowledgeStatus.value = item.knowledgeStatus || "inbox";
 }
 
 function setEditing(editing) {
@@ -283,7 +290,7 @@ function setEditing(editing) {
   elements.editModeButton.hidden = forcedReadonly;
   elements.shareButton.hidden = forcedReadonly;
   elements.storageNotice.textContent = forcedReadonly ? "只读预览" : "数据保存在当前浏览器";
-  [elements.itemTitle, elements.itemStatus, elements.itemDate, elements.itemBody].forEach((field) => {
+  [elements.itemTitle, elements.itemStatus, elements.itemDate, elements.itemBody, elements.itemKnowledgeType, elements.itemTags, elements.itemProject, elements.itemPeople, elements.itemKnowledgeStatus].forEach((field) => {
     field.disabled = !state.editing;
   });
 }
@@ -529,6 +536,13 @@ elements.detailForm.addEventListener("submit", (event) => {
   item.status = elements.itemStatus.value;
   item.date = elements.itemDate.value;
   item.body = elements.itemBody.value.trim();
+  if (item.category === "knowledge") {
+    item.knowledgeType = elements.itemKnowledgeType.value;
+    item.tags = elements.itemTags.value.trim();
+    item.project = elements.itemProject.value.trim();
+    item.people = elements.itemPeople.value.trim();
+    item.knowledgeStatus = elements.itemKnowledgeStatus.value;
+  }
   saveItems();
   renderItems();
   showToast("内容已保存");
