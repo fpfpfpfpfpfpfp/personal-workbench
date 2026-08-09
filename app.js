@@ -15,6 +15,7 @@ const RECOVERY_ANSWER_HASHES = new Set([
 ]);
 const remoteConfig = window.WORKBENCH_REMOTE || {};
 let activeEditorPassword = null;
+let graphRuntime = null;
 
 const knowledgeTypeLabels = {
   "project-memory": "项目记忆", person: "人物信息", concept: "概念与原理",
@@ -280,7 +281,11 @@ function renderKnowledgeLinks(item) {
 function renderKnowledgeGraph() {
   const isKnowledge = state.category === "knowledge";
   elements.knowledgeGraph.hidden = !isKnowledge;
-  if (!isKnowledge) return;
+  if (!isKnowledge) {
+    if (graphRuntime) cancelAnimationFrame(graphRuntime.frame);
+    graphRuntime = null;
+    return;
+  }
   const items = state.items.filter((item) => item.category === "knowledge");
   const nodes = [];
   const edges = [];
@@ -297,9 +302,163 @@ function renderKnowledgeGraph() {
       edges.push([`item:${item.id}`, nodeId]);
     }));
   });
-  const nodeHtml = nodes.map((node) => `<button class="graph-node ${node.kind}" data-graph-item="${escapeHtml(node.itemId)}" data-graph-query="${escapeHtml(node.itemId ? "" : node.label)}" type="button"><span>${escapeHtml(node.label)}</span></button>`).join("");
-  const edgeHtml = edges.map(([from, to]) => `<span class="graph-edge" data-from="${escapeHtml(from)}" data-to="${escapeHtml(to)}"></span>`).join("");
-  elements.knowledgeGraphCanvas.innerHTML = nodes.length ? `<div class="graph-nodes">${nodeHtml}</div><div class="graph-edge-list">${edgeHtml}</div>` : '<span class="knowledge-links-empty">新增知识并填写项目、人物或标签后，这里会形成关系图谱。</span>';
+  if (!nodes.length) {
+    elements.knowledgeGraphCanvas.innerHTML = '<span class="graph-empty">新增知识并填写项目、人物或标签后，这里会形成关系星图。</span>';
+    return;
+  }
+  elements.knowledgeGraphCanvas.innerHTML = '<canvas class="knowledge-star-canvas" aria-label="知识关系星图"></canvas>';
+  initializeKnowledgeGraph(elements.knowledgeGraphCanvas.querySelector("canvas"), nodes, edges);
+}
+
+function initializeKnowledgeGraph(canvas, nodes, edges) {
+  if (graphRuntime) cancelAnimationFrame(graphRuntime.frame);
+  const context = canvas.getContext("2d");
+  const colors = { knowledge: "#f0f4ff", project: "#55d7a7", person: "#ff79c8", tag: "#9e8cff" };
+  const byId = new Map();
+  nodes.forEach((node, index) => {
+    const angle = (index / Math.max(nodes.length, 1)) * Math.PI * 2;
+    const radius = 70 + (index % 5) * 24;
+    Object.assign(node, { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius, velocityX: 0, velocityY: 0, radius: node.kind === "knowledge" ? 6 : 4 });
+    byId.set(node.id, node);
+  });
+  const links = edges.map(([source, target]) => ({ source: byId.get(source), target: byId.get(target) })).filter((edge) => edge.source && edge.target);
+  const view = { width: 0, height: 0, scale: 1, offsetX: 0, offsetY: 0, hovered: null, dragged: null, pointerX: 0, pointerY: 0, frame: 0 };
+  graphRuntime = view;
+
+  const resize = () => {
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    view.width = canvas.clientWidth;
+    view.height = canvas.clientHeight;
+    canvas.width = Math.round(view.width * ratio);
+    canvas.height = Math.round(view.height * ratio);
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  };
+  resize();
+
+  const screenPosition = (node) => ({ x: view.width / 2 + view.offsetX + node.x * view.scale, y: view.height / 2 + view.offsetY + node.y * view.scale });
+  const findNode = (x, y) => nodes.findLast((node) => {
+    const point = screenPosition(node);
+    return Math.hypot(point.x - x, point.y - y) <= Math.max(10, node.radius * view.scale + 5);
+  });
+  const pointer = (event) => {
+    const bounds = canvas.getBoundingClientRect();
+    return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+  };
+
+  canvas.addEventListener("pointermove", (event) => {
+    const point = pointer(event);
+    view.pointerX = point.x;
+    view.pointerY = point.y;
+    if (view.dragged) {
+      view.dragged.x = (point.x - view.width / 2 - view.offsetX) / view.scale;
+      view.dragged.y = (point.y - view.height / 2 - view.offsetY) / view.scale;
+      view.dragged.velocityX = 0;
+      view.dragged.velocityY = 0;
+    }
+    view.hovered = findNode(point.x, point.y) || null;
+    canvas.style.cursor = view.dragged ? "grabbing" : view.hovered ? "pointer" : "grab";
+  });
+  canvas.addEventListener("pointerdown", (event) => {
+    const point = pointer(event);
+    view.dragged = findNode(point.x, point.y) || null;
+    if (view.dragged) canvas.setPointerCapture(event.pointerId);
+  });
+  canvas.addEventListener("pointerup", (event) => {
+    const point = pointer(event);
+    const released = findNode(point.x, point.y);
+    if (released && released === view.dragged) {
+      if (released.itemId) selectItem(released.itemId);
+      else {
+        state.search = released.label;
+        elements.searchInput.value = state.search;
+        renderItems();
+      }
+    }
+    view.dragged = null;
+  });
+  canvas.addEventListener("pointerleave", () => { view.hovered = null; view.dragged = null; });
+  canvas.addEventListener("wheel", (event) => {
+    event.preventDefault();
+    view.scale = Math.max(0.55, Math.min(2.2, view.scale * (event.deltaY > 0 ? 0.9 : 1.1)));
+  }, { passive: false });
+
+  const animate = () => {
+    if (elements.knowledgeGraph.hidden || graphRuntime !== view) return;
+    for (let left = 0; left < nodes.length; left += 1) {
+      for (let right = left + 1; right < nodes.length; right += 1) {
+        const first = nodes[left];
+        const second = nodes[right];
+        const deltaX = second.x - first.x;
+        const deltaY = second.y - first.y;
+        const distanceSquared = Math.max(deltaX * deltaX + deltaY * deltaY, 80);
+        const force = 55 / distanceSquared;
+        first.velocityX -= deltaX * force;
+        first.velocityY -= deltaY * force;
+        second.velocityX += deltaX * force;
+        second.velocityY += deltaY * force;
+      }
+    }
+    links.forEach(({ source, target }) => {
+      const deltaX = target.x - source.x;
+      const deltaY = target.y - source.y;
+      const distance = Math.max(Math.hypot(deltaX, deltaY), 1);
+      const force = (distance - 72) * 0.0009;
+      source.velocityX += deltaX * force;
+      source.velocityY += deltaY * force;
+      target.velocityX -= deltaX * force;
+      target.velocityY -= deltaY * force;
+    });
+    nodes.forEach((node) => {
+      if (node !== view.dragged) {
+        node.velocityX += -node.x * 0.00018;
+        node.velocityY += -node.y * 0.00018;
+        node.velocityX *= 0.92;
+        node.velocityY *= 0.92;
+        node.x += node.velocityX;
+        node.y += node.velocityY;
+      }
+    });
+
+    context.clearRect(0, 0, view.width, view.height);
+    const gradient = context.createRadialGradient(view.width * 0.52, view.height * 0.48, 10, view.width * 0.52, view.height * 0.48, view.width * 0.65);
+    gradient.addColorStop(0, "#17273a");
+    gradient.addColorStop(1, "#070b12");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, view.width, view.height);
+    links.forEach(({ source, target }) => {
+      const start = screenPosition(source);
+      const end = screenPosition(target);
+      const highlighted = view.hovered && (source === view.hovered || target === view.hovered);
+      context.strokeStyle = highlighted ? "rgba(117, 231, 195, .72)" : "rgba(167, 185, 210, .18)";
+      context.lineWidth = highlighted ? 1.3 : 0.7;
+      context.beginPath();
+      context.moveTo(start.x, start.y);
+      context.lineTo(end.x, end.y);
+      context.stroke();
+    });
+    nodes.forEach((node) => {
+      const point = screenPosition(node);
+      const connected = !view.hovered || node === view.hovered || links.some((link) => (link.source === view.hovered && link.target === node) || (link.target === view.hovered && link.source === node));
+      const radius = (node.radius + (node === view.hovered ? 3 : 0)) * Math.max(0.8, view.scale);
+      context.globalAlpha = connected ? 1 : 0.24;
+      context.shadowColor = colors[node.kind];
+      context.shadowBlur = node === view.hovered ? 18 : 7;
+      context.fillStyle = colors[node.kind];
+      context.beginPath();
+      context.arc(point.x, point.y, radius, 0, Math.PI * 2);
+      context.fill();
+      context.shadowBlur = 0;
+      if (node.kind === "knowledge" || node === view.hovered) {
+        context.fillStyle = "rgba(235, 241, 250, .9)";
+        context.font = `${node === view.hovered ? 12 : 10}px system-ui`;
+        context.fillText(node.label.slice(0, 18), point.x + radius + 5, point.y + 4);
+      }
+      context.globalAlpha = 1;
+    });
+    view.frame = requestAnimationFrame(animate);
+  };
+  view.frame = requestAnimationFrame(animate);
+  window.setTimeout(resize, 0);
 }
 
 function buildKnowledgeContext() {
@@ -619,18 +778,6 @@ elements.knowledgeLinksList.addEventListener("click", (event) => {
   if (link) selectItem(link.dataset.knowledgeLink);
 });
 
-elements.knowledgeGraphCanvas.addEventListener("click", (event) => {
-  const node = event.target.closest(".graph-node");
-  if (!node) return;
-  if (node.dataset.graphItem) {
-    selectItem(node.dataset.graphItem);
-    return;
-  }
-  state.search = node.dataset.graphQuery || "";
-  elements.searchInput.value = state.search;
-  renderItems();
-});
-
 elements.knowledgeContextButton.addEventListener("click", async () => {
   await navigator.clipboard.writeText(buildKnowledgeContext());
   showToast("AI 背景包已复制");
@@ -664,6 +811,7 @@ elements.newItemButton.addEventListener("click", () => {
   const item = { id: crypto.randomUUID(), category: state.category, title: "未命名内容", body: "", status: "active", date: today() };
   state.items.unshift(item);
   saveItems();
+  if (state.category === "knowledge") renderKnowledgeGraph();
   selectItem(item.id);
   elements.itemTitle.focus();
   elements.itemTitle.select();
@@ -687,6 +835,7 @@ elements.detailForm.addEventListener("submit", (event) => {
   }
   saveItems();
   renderItems();
+  if (item.category === "knowledge") renderKnowledgeGraph();
   showToast("内容已保存");
 });
 
@@ -697,6 +846,7 @@ elements.deleteButton.addEventListener("click", () => {
   state.selectedId = null;
   saveItems();
   renderItems();
+  if (state.category === "knowledge") renderKnowledgeGraph();
   renderDetail();
   showToast("内容已删除");
 });
