@@ -72,7 +72,7 @@ const state = {
 const elements = Object.fromEntries([
   "categoryNav", "categoryEyebrow", "categoryTitle", "categoryDescription", "itemList", "emptyState",
   "detailPanel", "detailEmpty", "detailForm", "detailCategory", "itemTitle", "itemStatus", "itemDate",
-  "itemBody", "knowledgeFields", "itemKnowledgeType", "itemTags", "itemProject", "itemPeople", "itemKnowledgeStatus", "tagSuggestions", "projectSuggestions", "peopleSuggestions", "knowledgeFilters", "knowledgeTypeFilter", "knowledgeStatusFilter", "newItemButton", "deleteButton", "searchInput", "editModeButton", "modeLabel", "shareButton",
+  "itemBody", "knowledgeFields", "itemKnowledgeType", "itemTags", "itemProject", "itemPeople", "itemKnowledgeStatus", "tagSuggestions", "projectSuggestions", "peopleSuggestions", "knowledgeFilters", "knowledgeSummary", "knowledgeTypeFilter", "knowledgeStatusFilter", "newItemButton", "deleteButton", "searchInput", "editModeButton", "modeLabel", "shareButton",
   "accessDialog", "accessForm", "accessTitle", "accessDescription", "accessKey", "accessError", "cancelAccess",
   "weeklyCount", "toast", "storageNotice", "protectedDialog", "protectedForm", "protectedTitle",
   "protectedDescription", "protectedPasswordLabel", "protectedPassword", "recoveryAnswerLabel", "recoveryAnswer",
@@ -260,12 +260,21 @@ function renderKnowledgeSuggestions() {
 }
 
 function renderItems() {
-  const items = visibleItems();
+  const statusOrder = { current: 0, question: 1, inbox: 2, draft: 3 };
+  const items = visibleItems().sort((a, b) => {
+    if (state.category !== "knowledge") return 0;
+    return (statusOrder[a.knowledgeStatus || "inbox"] ?? 9) - (statusOrder[b.knowledgeStatus || "inbox"] ?? 9);
+  });
+  if (state.category === "knowledge") {
+    const knowledgeItems = state.items.filter((item) => item.category === "knowledge");
+    const count = (status) => knowledgeItems.filter((item) => (item.knowledgeStatus || "inbox") === status).length;
+    elements.knowledgeSummary.innerHTML = `<span class="current">当前结论 ${count("current")}</span><span class="question">待确认 ${count("question")}</span><span class="inbox">待整理 ${count("inbox")}</span><span class="draft">历史草稿 ${count("draft")}</span>`;
+  }
   elements.itemList.innerHTML = items.map((item) => `
     <button class="item-card ${item.id === state.selectedId ? "selected" : ""}" data-id="${item.id}" type="button">
       <span class="item-card-main">
         <span class="item-title">${escapeHtml(item.title)}</span>
-        ${item.category === "knowledge" ? `<span class="knowledge-card-meta"><span>${escapeHtml(knowledgeTypeLabels[item.knowledgeType] || "待分类")}</span><span>${escapeHtml(knowledgeStatusLabels[item.knowledgeStatus || "inbox"])}</span>${item.tags ? `<span># ${escapeHtml(item.tags)}</span>` : ""}</span>` : ""}
+        ${item.category === "knowledge" ? `<span class="knowledge-card-meta"><span>${escapeHtml(knowledgeTypeLabels[item.knowledgeType] || "待分类")}</span><span class="knowledge-state ${item.knowledgeStatus || "inbox"}">${escapeHtml(knowledgeStatusLabels[item.knowledgeStatus || "inbox"])}</span>${item.tags ? `<span># ${escapeHtml(item.tags)}</span>` : ""}</span>` : ""}
         <span class="item-preview">${escapeHtml(item.body || "暂无详细内容")}</span>
       </span>
       <span class="item-meta">
@@ -285,6 +294,7 @@ function renderCategory() {
   elements.categoryDescription.textContent = category.description;
   document.body.classList.toggle("settings-view", state.category === SETTINGS_CATEGORY);
   elements.knowledgeFilters.hidden = state.category !== "knowledge";
+  elements.knowledgeSummary.hidden = state.category !== "knowledge";
   renderNav();
   renderItems();
 }
