@@ -72,7 +72,7 @@ const state = {
 const elements = Object.fromEntries([
   "categoryNav", "categoryEyebrow", "categoryTitle", "categoryDescription", "itemList", "emptyState",
   "detailPanel", "detailEmpty", "detailForm", "detailCategory", "itemTitle", "itemStatus", "itemDate",
-  "itemBody", "knowledgeFields", "itemKnowledgeType", "itemTags", "itemProject", "itemPeople", "itemKnowledgeStatus", "knowledgeLinks", "knowledgeLinksList", "knowledgeGraph", "knowledgeGraphCanvas", "tagSuggestions", "projectSuggestions", "peopleSuggestions", "knowledgeFilters", "knowledgeSummary", "knowledgeTypeFilter", "knowledgeStatusFilter", "newItemButton", "deleteButton", "searchInput", "editModeButton", "modeLabel", "shareButton",
+  "itemBody", "knowledgeFields", "itemKnowledgeType", "itemTags", "itemProject", "itemPeople", "itemKnowledgeStatus", "knowledgeLinks", "knowledgeLinksList", "knowledgeGraph", "knowledgeGraphCanvas", "knowledgeContextButton", "tagSuggestions", "projectSuggestions", "peopleSuggestions", "knowledgeFilters", "knowledgeSummary", "knowledgeTypeFilter", "knowledgeStatusFilter", "newItemButton", "deleteButton", "searchInput", "editModeButton", "modeLabel", "shareButton",
   "accessDialog", "accessForm", "accessTitle", "accessDescription", "accessKey", "accessError", "cancelAccess",
   "weeklyCount", "toast", "storageNotice", "protectedDialog", "protectedForm", "protectedTitle",
   "protectedDescription", "protectedPasswordLabel", "protectedPassword", "recoveryAnswerLabel", "recoveryAnswer",
@@ -297,9 +297,26 @@ function renderKnowledgeGraph() {
       edges.push([`item:${item.id}`, nodeId]);
     }));
   });
-  const nodeHtml = nodes.map((node) => `<button class="graph-node ${node.kind}" data-graph-item="${escapeHtml(node.itemId)}" type="button"><span>${escapeHtml(node.label)}</span></button>`).join("");
+  const nodeHtml = nodes.map((node) => `<button class="graph-node ${node.kind}" data-graph-item="${escapeHtml(node.itemId)}" data-graph-query="${escapeHtml(node.itemId ? "" : node.label)}" type="button"><span>${escapeHtml(node.label)}</span></button>`).join("");
   const edgeHtml = edges.map(([from, to]) => `<span class="graph-edge" data-from="${escapeHtml(from)}" data-to="${escapeHtml(to)}"></span>`).join("");
   elements.knowledgeGraphCanvas.innerHTML = nodes.length ? `<div class="graph-nodes">${nodeHtml}</div><div class="graph-edge-list">${edgeHtml}</div>` : '<span class="knowledge-links-empty">新增知识并填写项目、人物或标签后，这里会形成关系图谱。</span>';
+}
+
+function buildKnowledgeContext() {
+  const statusOrder = { current: 0, question: 1, inbox: 2, draft: 3 };
+  const items = state.items.filter((item) => item.category === "knowledge" && (item.knowledgeStatus || "inbox") !== "draft")
+    .sort((a, b) => (statusOrder[a.knowledgeStatus || "inbox"] ?? 9) - (statusOrder[b.knowledgeStatus || "inbox"] ?? 9));
+  const sections = items.map((item, index) => [
+    `## ${String(index + 1).padStart(2, "0")} ${item.title || "未命名知识"}`,
+    `- 类型：${knowledgeTypeLabels[item.knowledgeType] || "待分类"}`,
+    `- 状态：${knowledgeStatusLabels[item.knowledgeStatus || "inbox"]}`,
+    item.project ? `- 关联项目：${item.project}` : "",
+    item.people ? `- 关联人物：${item.people}` : "",
+    item.tags ? `- 标签：${item.tags}` : "",
+    "",
+    item.body || "暂无正文",
+  ].filter(Boolean).join("\n"));
+  return [`# 04 个人知识库｜AI 背景包`, ``, `生成日期：${today()}`, `说明：优先采用“当前结论”，待确认问题需要核实；历史草稿已排除。`, ``, ...sections].join("\n");
 }
 
 function renderItems() {
@@ -600,6 +617,23 @@ elements.itemList.addEventListener("click", (event) => {
 elements.knowledgeLinksList.addEventListener("click", (event) => {
   const link = event.target.closest("[data-knowledge-link]");
   if (link) selectItem(link.dataset.knowledgeLink);
+});
+
+elements.knowledgeGraphCanvas.addEventListener("click", (event) => {
+  const node = event.target.closest(".graph-node");
+  if (!node) return;
+  if (node.dataset.graphItem) {
+    selectItem(node.dataset.graphItem);
+    return;
+  }
+  state.search = node.dataset.graphQuery || "";
+  elements.searchInput.value = state.search;
+  renderItems();
+});
+
+elements.knowledgeContextButton.addEventListener("click", async () => {
+  await navigator.clipboard.writeText(buildKnowledgeContext());
+  showToast("AI 背景包已复制");
 });
 
 elements.searchInput.addEventListener("input", (event) => {

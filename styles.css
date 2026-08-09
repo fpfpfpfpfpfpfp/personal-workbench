@@ -182,8 +182,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); box-sha
 .knowledge-link:hover { border-color: var(--accent); }
 .knowledge-link span, .knowledge-links-empty { color: var(--muted); font-size: 11px; }
 .knowledge-graph { margin: 0 0 18px; padding: 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-soft); }
-.knowledge-graph-heading { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 12px; font-size: 12px; }
+.knowledge-graph-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; font-size: 12px; }
+.knowledge-graph-heading > div { display: grid; gap: 4px; }
 .knowledge-graph-heading span { color: var(--muted); font-size: 11px; }
+.knowledge-graph-heading .button { min-height: 32px; padding: 0 10px; white-space: nowrap; }
 .knowledge-graph-canvas { overflow-x: auto; }
 .graph-nodes { display: flex; flex-wrap: wrap; gap: 8px; }
 .graph-node { padding: 7px 9px; border: 1px solid var(--line); border-radius: 5px; color: var(--text); background: var(--surface); text-align: left; cursor: pointer; }
