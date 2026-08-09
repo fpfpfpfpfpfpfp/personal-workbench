@@ -72,7 +72,7 @@ const state = {
 const elements = Object.fromEntries([
   "categoryNav", "categoryEyebrow", "categoryTitle", "categoryDescription", "itemList", "emptyState",
   "detailPanel", "detailEmpty", "detailForm", "detailCategory", "itemTitle", "itemStatus", "itemDate",
-  "itemBody", "knowledgeFields", "itemKnowledgeType", "itemTags", "itemProject", "itemPeople", "itemKnowledgeStatus", "tagSuggestions", "projectSuggestions", "peopleSuggestions", "knowledgeFilters", "knowledgeSummary", "knowledgeTypeFilter", "knowledgeStatusFilter", "newItemButton", "deleteButton", "searchInput", "editModeButton", "modeLabel", "shareButton",
+  "itemBody", "knowledgeFields", "itemKnowledgeType", "itemTags", "itemProject", "itemPeople", "itemKnowledgeStatus", "knowledgeLinks", "knowledgeLinksList", "tagSuggestions", "projectSuggestions", "peopleSuggestions", "knowledgeFilters", "knowledgeSummary", "knowledgeTypeFilter", "knowledgeStatusFilter", "newItemButton", "deleteButton", "searchInput", "editModeButton", "modeLabel", "shareButton",
   "accessDialog", "accessForm", "accessTitle", "accessDescription", "accessKey", "accessError", "cancelAccess",
   "weeklyCount", "toast", "storageNotice", "protectedDialog", "protectedForm", "protectedTitle",
   "protectedDescription", "protectedPasswordLabel", "protectedPassword", "recoveryAnswerLabel", "recoveryAnswer",
@@ -259,6 +259,24 @@ function renderKnowledgeSuggestions() {
   elements.peopleSuggestions.innerHTML = renderOptions(collect("people"));
 }
 
+function renderKnowledgeLinks(item) {
+  const isKnowledge = item?.category === "knowledge";
+  elements.knowledgeLinks.hidden = !isKnowledge;
+  if (!isKnowledge) return;
+  const currentTags = normalizeList(item.tags).toLowerCase().split(", ").filter(Boolean);
+  const related = state.items.filter((candidate) => {
+    if (candidate.category !== "knowledge" || candidate.id === item.id) return false;
+    const candidateTags = normalizeList(candidate.tags).toLowerCase().split(", ").filter(Boolean);
+    const sharedTag = currentTags.some((tag) => candidateTags.includes(tag));
+    const sharedProject = item.project && candidate.project && item.project.toLowerCase() === candidate.project.toLowerCase();
+    const sharedPerson = item.people && candidate.people && item.people.toLowerCase() === candidate.people.toLowerCase();
+    return sharedTag || sharedProject || sharedPerson;
+  }).slice(0, 8);
+  elements.knowledgeLinksList.innerHTML = related.length
+    ? related.map((candidate) => `<button class="knowledge-link" data-knowledge-link="${candidate.id}" type="button"><strong>${escapeHtml(candidate.title)}</strong><span>${escapeHtml(knowledgeStatusLabels[candidate.knowledgeStatus || "inbox"])}</span></button>`).join("")
+    : '<span class="knowledge-links-empty">填写相同的标签、项目或人物后，这里会显示相关知识。</span>';
+}
+
 function renderItems() {
   const statusOrder = { current: 0, question: 1, inbox: 2, draft: 3 };
   const items = visibleItems().sort((a, b) => {
@@ -328,6 +346,7 @@ function renderDetail() {
   elements.itemProject.value = item.project || "";
   elements.itemPeople.value = item.people || "";
   elements.itemKnowledgeStatus.value = item.knowledgeStatus || "inbox";
+  renderKnowledgeLinks(item);
 }
 
 function setEditing(editing) {
@@ -550,6 +569,11 @@ elements.cancelProtected.addEventListener("click", () => {
 elements.itemList.addEventListener("click", (event) => {
   const card = event.target.closest("[data-id]");
   if (card) selectItem(card.dataset.id);
+});
+
+elements.knowledgeLinksList.addEventListener("click", (event) => {
+  const link = event.target.closest("[data-knowledge-link]");
+  if (link) selectItem(link.dataset.knowledgeLink);
 });
 
 elements.searchInput.addEventListener("input", (event) => {

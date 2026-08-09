@@ -175,6 +175,12 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); box-sha
 .knowledge-summary .question, .knowledge-state.question { color: #8a5a00; background: #fff0c7; }
 .knowledge-summary .inbox, .knowledge-state.inbox { color: #52606d; background: #edf0f2; }
 .knowledge-summary .draft, .knowledge-state.draft { color: #6f5974; background: #f0e8f2; }
+.knowledge-links { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.section-kicker { margin-bottom: 9px; color: var(--muted); font-size: 11px; font-weight: 700; }
+.knowledge-links-list { display: grid; gap: 7px; }
+.knowledge-link { display: flex; justify-content: space-between; gap: 12px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface-soft); color: var(--text); text-align: left; cursor: pointer; }
+.knowledge-link:hover { border-color: var(--accent); }
+.knowledge-link span, .knowledge-links-empty { color: var(--muted); font-size: 11px; }
 
 .item-list { display: grid; gap: 9px; }
 
