@@ -72,7 +72,7 @@ const state = {
 const elements = Object.fromEntries([
   "categoryNav", "categoryEyebrow", "categoryTitle", "categoryDescription", "itemList", "emptyState",
   "detailPanel", "detailEmpty", "detailForm", "detailCategory", "itemTitle", "itemStatus", "itemDate",
-  "itemBody", "knowledgeFields", "itemKnowledgeType", "itemTags", "itemProject", "itemPeople", "itemKnowledgeStatus", "knowledgeLinks", "knowledgeLinksList", "tagSuggestions", "projectSuggestions", "peopleSuggestions", "knowledgeFilters", "knowledgeSummary", "knowledgeTypeFilter", "knowledgeStatusFilter", "newItemButton", "deleteButton", "searchInput", "editModeButton", "modeLabel", "shareButton",
+  "itemBody", "knowledgeFields", "itemKnowledgeType", "itemTags", "itemProject", "itemPeople", "itemKnowledgeStatus", "knowledgeLinks", "knowledgeLinksList", "knowledgeGraph", "knowledgeGraphCanvas", "tagSuggestions", "projectSuggestions", "peopleSuggestions", "knowledgeFilters", "knowledgeSummary", "knowledgeTypeFilter", "knowledgeStatusFilter", "newItemButton", "deleteButton", "searchInput", "editModeButton", "modeLabel", "shareButton",
   "accessDialog", "accessForm", "accessTitle", "accessDescription", "accessKey", "accessError", "cancelAccess",
   "weeklyCount", "toast", "storageNotice", "protectedDialog", "protectedForm", "protectedTitle",
   "protectedDescription", "protectedPasswordLabel", "protectedPassword", "recoveryAnswerLabel", "recoveryAnswer",
@@ -277,6 +277,31 @@ function renderKnowledgeLinks(item) {
     : '<span class="knowledge-links-empty">填写相同的标签、项目或人物后，这里会显示相关知识。</span>';
 }
 
+function renderKnowledgeGraph() {
+  const isKnowledge = state.category === "knowledge";
+  elements.knowledgeGraph.hidden = !isKnowledge;
+  if (!isKnowledge) return;
+  const items = state.items.filter((item) => item.category === "knowledge");
+  const nodes = [];
+  const edges = [];
+  const seen = new Set();
+  const addNode = (id, label, kind, itemId = "") => {
+    if (!seen.has(id)) { seen.add(id); nodes.push({ id, label, kind, itemId }); }
+  };
+  items.forEach((item) => {
+    addNode(`item:${item.id}`, item.title || "未命名内容", "knowledge", item.id);
+    const fields = [["项目", item.project, "project"], ["人物", item.people, "person"], ["标签", item.tags, "tag"]];
+    fields.forEach(([prefix, value, kind]) => normalizeList(value).split(", ").filter(Boolean).forEach((entry) => {
+      const nodeId = `${kind}:${entry.toLowerCase()}`;
+      addNode(nodeId, entry, kind);
+      edges.push([`item:${item.id}`, nodeId]);
+    }));
+  });
+  const nodeHtml = nodes.map((node) => `<button class="graph-node ${node.kind}" data-graph-item="${escapeHtml(node.itemId)}" type="button"><span>${escapeHtml(node.label)}</span></button>`).join("");
+  const edgeHtml = edges.map(([from, to]) => `<span class="graph-edge" data-from="${escapeHtml(from)}" data-to="${escapeHtml(to)}"></span>`).join("");
+  elements.knowledgeGraphCanvas.innerHTML = nodes.length ? `<div class="graph-nodes">${nodeHtml}</div><div class="graph-edge-list">${edgeHtml}</div>` : '<span class="knowledge-links-empty">新增知识并填写项目、人物或标签后，这里会形成关系图谱。</span>';
+}
+
 function renderItems() {
   const statusOrder = { current: 0, question: 1, inbox: 2, draft: 3 };
   const items = visibleItems().sort((a, b) => {
@@ -313,6 +338,7 @@ function renderCategory() {
   document.body.classList.toggle("settings-view", state.category === SETTINGS_CATEGORY);
   elements.knowledgeFilters.hidden = state.category !== "knowledge";
   elements.knowledgeSummary.hidden = state.category !== "knowledge";
+  renderKnowledgeGraph();
   renderNav();
   renderItems();
 }
