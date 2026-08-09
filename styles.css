@@ -258,7 +258,9 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); box-sha
 .knowledge-suggestion-list button:hover { border-color: var(--accent); }
 .knowledge-suggestion-list button span { margin-right: 5px; color: var(--muted); font-size: 9px; }
 .knowledge-suggestion-empty { color: var(--muted); font-size: 11px; }
-.knowledge-manager-dialog { width: min(620px, calc(100vw - 28px)); }
+.knowledge-manager-dialog { width: min(620px, calc(100vw - 28px)); padding: 22px; }
+.knowledge-manager-dialog > .dialog-heading { margin-bottom: 18px; }
+.knowledge-manager-dialog > .dialog-actions { margin-top: 18px; }
 .knowledge-manager-content { max-height: 58vh; overflow-y: auto; display: grid; gap: 9px; }
 .metadata-group { overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-soft); }
 .metadata-group summary { padding: 12px 13px; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; }
@@ -281,7 +283,8 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); box-sha
 .form-actions { justify-content: space-between; gap: 12px; }
 .form-actions span { color: var(--muted); font-size: 11px; }
 
-.readonly input, .readonly textarea, .readonly select { border-color: transparent; background: var(--surface-soft); pointer-events: none; }
+.readonly #detailForm input, .readonly #detailForm textarea, .readonly #detailForm select { border-color: transparent; background: var(--surface-soft); pointer-events: none; }
+.readonly .knowledge-filter-row select { border-color: var(--line); background: var(--surface); pointer-events: auto; cursor: pointer; }
 .readonly .edit-only { display: none !important; }
 
 .empty-state { padding: 64px 20px; display: grid; justify-items: center; gap: 8px; color: var(--muted); text-align: center; }

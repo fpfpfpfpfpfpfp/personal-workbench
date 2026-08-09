@@ -711,6 +711,7 @@ function setEditing(editing) {
   [elements.itemTitle, elements.itemStatus, elements.itemDate, elements.itemBody, elements.itemKnowledgeType, elements.itemTags, elements.itemProject, elements.itemPeople, elements.itemKnowledgeStatus].forEach((field) => {
     field.disabled = !state.editing;
   });
+  if (state.category === "knowledge") renderKnowledgeTypeOptions();
 }
 
 function selectItem(id) {
