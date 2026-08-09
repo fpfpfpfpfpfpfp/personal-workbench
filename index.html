@@ -152,10 +152,10 @@
                 </select>
               </label>
               <div class="form-grid">
-                <label>标签<input id="itemTags" placeholder="例如：项目A, 决策" /></label>
-                <label>关联项目<input id="itemProject" placeholder="例如：项目A" /></label>
+                <label>标签<input id="itemTags" list="tagSuggestions" placeholder="例如：项目A, 决策" /></label>
+                <label>关联项目<input id="itemProject" list="projectSuggestions" placeholder="例如：项目A" /></label>
               </div>
-              <label>关联人物<input id="itemPeople" placeholder="例如：雷澍" /></label>
+              <label>关联人物<input id="itemPeople" list="peopleSuggestions" placeholder="例如：雷澍" /></label>
               <label>知识状态
                 <select id="itemKnowledgeStatus">
                   <option value="inbox">待整理</option>
@@ -165,6 +165,9 @@
                 </select>
               </label>
             </div>
+            <datalist id="tagSuggestions"></datalist>
+            <datalist id="projectSuggestions"></datalist>
+            <datalist id="peopleSuggestions"></datalist>
 
             <label>
               内容

@@ -72,7 +72,7 @@ const state = {
 const elements = Object.fromEntries([
   "categoryNav", "categoryEyebrow", "categoryTitle", "categoryDescription", "itemList", "emptyState",
   "detailPanel", "detailEmpty", "detailForm", "detailCategory", "itemTitle", "itemStatus", "itemDate",
-  "itemBody", "knowledgeFields", "itemKnowledgeType", "itemTags", "itemProject", "itemPeople", "itemKnowledgeStatus", "knowledgeFilters", "knowledgeTypeFilter", "knowledgeStatusFilter", "newItemButton", "deleteButton", "searchInput", "editModeButton", "modeLabel", "shareButton",
+  "itemBody", "knowledgeFields", "itemKnowledgeType", "itemTags", "itemProject", "itemPeople", "itemKnowledgeStatus", "tagSuggestions", "projectSuggestions", "peopleSuggestions", "knowledgeFilters", "knowledgeTypeFilter", "knowledgeStatusFilter", "newItemButton", "deleteButton", "searchInput", "editModeButton", "modeLabel", "shareButton",
   "accessDialog", "accessForm", "accessTitle", "accessDescription", "accessKey", "accessError", "cancelAccess",
   "weeklyCount", "toast", "storageNotice", "protectedDialog", "protectedForm", "protectedTitle",
   "protectedDescription", "protectedPasswordLabel", "protectedPassword", "recoveryAnswerLabel", "recoveryAnswer",
@@ -235,6 +235,30 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function normalizeList(value) {
+  const seen = new Set();
+  return String(value || "")
+    .split(/[,，;；\n]+/)
+    .map((entry) => entry.trim().replace(/^#+/, ""))
+    .filter((entry) => {
+      if (!entry) return false;
+      const key = entry.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .join(", ");
+}
+
+function renderKnowledgeSuggestions() {
+  const knowledgeItems = state.items.filter((item) => item.category === "knowledge");
+  const collect = (field) => [...new Set(knowledgeItems.flatMap((item) => normalizeList(item[field]).split(", ")).filter(Boolean))].sort();
+  const renderOptions = (values) => values.map((value) => `<option value="${escapeHtml(value)}"></option>`).join("");
+  elements.tagSuggestions.innerHTML = renderOptions(collect("tags"));
+  elements.projectSuggestions.innerHTML = renderOptions(collect("project"));
+  elements.peopleSuggestions.innerHTML = renderOptions(collect("people"));
+}
+
 function renderItems() {
   const items = visibleItems();
   elements.itemList.innerHTML = items.map((item) => `
@@ -288,6 +312,7 @@ function renderDetail() {
   elements.itemBody.value = item.body || "";
   const isKnowledge = state.category === "knowledge";
   elements.knowledgeFields.hidden = !isKnowledge;
+  if (isKnowledge) renderKnowledgeSuggestions();
   elements.itemKnowledgeType.value = item.knowledgeType || "";
   elements.itemTags.value = item.tags || "";
   elements.itemProject.value = item.project || "";
@@ -561,9 +586,9 @@ elements.detailForm.addEventListener("submit", (event) => {
   item.body = elements.itemBody.value.trim();
   if (item.category === "knowledge") {
     item.knowledgeType = elements.itemKnowledgeType.value;
-    item.tags = elements.itemTags.value.trim();
-    item.project = elements.itemProject.value.trim();
-    item.people = elements.itemPeople.value.trim();
+    item.tags = normalizeList(elements.itemTags.value);
+    item.project = normalizeList(elements.itemProject.value);
+    item.people = normalizeList(elements.itemPeople.value);
     item.knowledgeStatus = elements.itemKnowledgeStatus.value;
   }
   saveItems();
